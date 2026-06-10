@@ -1,0 +1,210 @@
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_ca8c34497641e6::t_1b91878e8c803b 145-147
+  s_9834e2a403c222::t_9173fd0850a43c 1-127,136-144,148-194
+  s_95a32a73aef8eb::t_6a82ff0f313b03 128-135
+build.gradle.kts
+  s_9834e2a403c222::t_f75bd29b0005e3 1-5
+settings.gradle.kts
+  s_9834e2a403c222::t_f75bd29b0005e3 1-18
+app/build.gradle.kts
+  s_9834e2a403c222::t_f75bd29b0005e3 1-53
+app/src/test/java/com/njord/mobile/ui/CoinLogoCacheTest.kt
+  s_5e04332782000b::t_6f2bd79647ebfb 1-53
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_9834e2a403c222::t_17a9d27d5f4a19 1-63
+gradlew.bat
+  s_9834e2a403c222::t_f75bd29b0005e3 1-10
+app/src/androidTest/java/com/njord/mobile/NjordAppTest.kt
+  s_ca8c34497641e6::t_23e007cdad39db 3,274
+  s_ca8c34497641e6::t_23ccc10582a741 211-213,215,217-225,241-243,245-253,266-273,275
+  s_95a32a73aef8eb::t_e612bcd35f18b2 31,148
+  s_889169a16310fa::t_4d797a2efb48ae 109-113
+  s_95a32a73aef8eb::t_012b183ee0cfca 50-56
+  s_095936ed0adcb1::t_fdd642dfc4b243 6,10,47-49,57-78
+  s_4083bdc10397b0::t_cc29ee242bc987 137-147,149-163,165,167-169
+  s_95a32a73aef8eb::t_ae51680e2bac65 177-178,180-185
+  s_4083bdc10397b0::t_131c698254933d 164,166
+  s_95a32a73aef8eb::t_0afad139087a9b 117-136
+  s_9834e2a403c222::t_dfa5bf5a8a3d7f 20-24,30,32-37,280
+  s_503afb04ddb1a8::t_54db48c417d1f2 179
+  s_503afb04ddb1a8::t_a7f3b74b8b5dee 194-198
+  s_889169a16310fa::t_effe970de60089 98-108
+  s_503afb04ddb1a8::t_b695a4a256e596 114-116,170-176,186-193
+  s_95a32a73aef8eb::t_0108cbb40dc7d2 25-29,279,282-283
+  s_ca8c34497641e6::t_d75af6db8a1684 214,216,226-234,244,254-265
+  s_9834e2a403c222::t_17a9d27d5f4a19 1-2,4-5,7-9,11-19,38-46,79-97,199-210,235-240,276-278,281,284-285
+.gitignore
+  s_9834e2a403c222::t_fa809b2c26d61a 1-7
+app/src/main/java/com/njord/mobile/MainActivity.kt
+  s_9834e2a403c222::t_68b95fbd24f9d7 1-17
+app/src/main/java/com/njord/mobile/ui/CoinLogoCache.kt
+  s_5e04332782000b::t_6f2bd79647ebfb 1-43
+app/src/main/res/values/strings.xml
+  s_9834e2a403c222::t_f75bd29b0005e3 1-3
+app/src/main/res/drawable/ic_launcher_round.xml
+  s_9834e2a403c222::t_68b95fbd24f9d7 1-8
+gradle/wrapper/gradle-wrapper.properties
+  s_9834e2a403c222::t_f75bd29b0005e3 1-7
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_ca8c34497641e6::t_2467b3ccd8a200 1984
+  s_095936ed0adcb1::t_ba4c79cbaefda3 1856-1860,1863,1870-1897,1899-1905
+  s_503afb04ddb1a8::t_90f471d7406ac9 43,49,698-699,1793,1821-1829,1831-1834,1836-1839
+  s_95a32a73aef8eb::t_150b21506aac97 1639
+  s_9834e2a403c222::t_2cef96208f9e73 91,248-250,299,301,304-305,307-308,311-312,314
+  s_889169a16310fa::t_15770749ba1c1c 41-42,418,422
+  s_ca8c34497641e6::t_9719446b2ded0a 1391-1403,1406-1420,1431-1434,1436-1438,1441,1443-1445,1456-1457,1494,1505,1542-1543
+  s_5e04332782000b::t_e91aa7c3de4108 2192-2199
+  s_9834e2a403c222::t_7fe86db48c9843 56,739
+  s_9834e2a403c222::t_62b79edd49a7c8 11,2083,2090,2093
+  s_ca8c34497641e6::t_66360d767a749b 373
+  s_95a32a73aef8eb::t_1f32fc7ebc31e7 1716-1720,1722,1732-1739,1741-1744,1746-1748,1751-1762,1773-1776,1778,1787,1790-1791,1796,1798-1800,1802-1816,1818,1820
+  s_ca8c34497641e6::t_b1c12605ab9e1d 694,710,717-718,720,722-723,1948-1952,1955-1968,1970-1983,1985-1993,2001-2050,2052-2054
+  s_503afb04ddb1a8::t_7cf7693aec5829 110,240-243,247,435-436,452-457,459,464,471,477,1712-1715,1723,1727-1730,1740,1763,1768-1772,1779,1783-1786,1788-1789,1794-1795
+  s_ca8c34497641e6::t_88b4ad08d40981 18,27,35
+  s_5e04332782000b::t_6f2bd79647ebfb 3,87,2158,2162,2185,2187-2191,2200-2205,2237,2242,2247-2249
+  s_95a32a73aef8eb::t_6de0226bf74ff5 449,460,465,472,475-476,1721,1724-1726,1731,1745,1749-1750,1764-1767,1777,1780-1782,1792,1797,1801,1817,1819
+  s_503afb04ddb1a8::t_cd71e812b9a9c2 1830,1835
+  s_aae70c89b6d9de::t_90641be4a134b4 1404-1405,1506-1534
+  s_095936ed0adcb1::t_6b068e960a98fb 875-877
+  s_889169a16310fa::t_9da07fbcca55e7 119,122,2209-2233,2235-2236,2238,2250-2257
+  s_ca8c34497641e6::t_4a333086110bdc 360-371,374-381,383
+  s_9834e2a403c222::t_68b95fbd24f9d7 1-2,10,13,15-17,19-26,28-34,36-40,44-48,51-55,57-76,78-82,84-85,88-90,92-109,111-116,123,128-130,134-137,144,191-239,251-296,298,300,302-303,306,309-310,315-320,322-327,350-359,372,382,384-401,429-434,470,478-484,499-546,548-558,683-693,695-697,700-709,711-716,719,721,724-738,740-751,963-972,1000-1001,1003-1019,1059,1084,1176-1206,1277,1282-1283,1307,1379,1382,1484,1554-1572,1626,1642,1658,1660,1673-1691,1840-1855,1861-1862,1864-1869,1898,1906-1910,1947,1969,1994-2000,2051,2055-2082,2084-2089,2091-2092,2094-2155,2165-2171,2245-2246,2258-2306
+  s_aae70c89b6d9de::t_d3a4e13b6b2b1d 5-9,1144-1155,1158,1161-1175
+  s_95a32a73aef8eb::t_760191097b8d00 313,987-999
+  s_95a32a73aef8eb::t_900086faf199b3 485-498
+  s_095936ed0adcb1::t_029ee5ea17d7ee 789-794,797-874,878-881,884-962
+  s_95a32a73aef8eb::t_6cc7ef8e6341df 1029
+  s_ca8c34497641e6::t_322c1c06f915ed 1207-1216,1219-1226,1229-1238,1241-1249,1258-1260,1262-1267,1269-1276,1278,1280-1281,1284-1306,1308-1322,1343-1346,1349-1378,1380-1381,1383-1390,1421-1429,1439-1440,1442,1446-1450,1452,1458-1483,1485-1493,1496-1498,1500,1502,1504,1535-1541,1544-1546,1548-1549,1551
+  s_95a32a73aef8eb::t_9a50141c48f98d 437-448,450-451,458,461-463,466-469,473-474
+  s_aae70c89b6d9de::t_50af5086da1465 124-127,131-133,139-143
+  s_aae70c89b6d9de::t_d86a5de56b29e3 1451,1453-1455,1547,1550,1553
+  s_95a32a73aef8eb::t_e1a8248412e549 297,752,758
+  s_aae70c89b6d9de::t_6f6848db7f8c03 1217-1218,1227-1228,1239-1240,1250-1257,1261,1268
+  s_9834e2a403c222::t_4c83f8d73f499b 753-757,759-788,973-986,1002,1020-1028,1030-1041,1054-1058,1060-1068,1081-1083,1085-1088,1111-1143,1156-1157,1159-1160
+  s_aae70c89b6d9de::t_3ff0e4f48c8fde 1042-1053,1069-1080,1089-1110
+  s_aae70c89b6d9de::t_4c687bf9aefa37 1279,1323-1342,1347-1348
+  s_95a32a73aef8eb::t_95ccc4a95b7414 1573-1625,1627-1638,1640-1641,1643-1657,1659,1661-1672
+  s_aae70c89b6d9de::t_da900e76bf81b4 1430,1435,1495,1499,1501,1503,1552
+  s_889169a16310fa::t_c1abdfd8d905bd 4,12,77,83,86,117-118,120-121,157-188
+  s_ca8c34497641e6::t_5cf50043c80ee1 1911-1946
+  s_aae70c89b6d9de::t_aa4358580f60e9 1953-1954
+  s_889169a16310fa::t_c8cab7e153256e 2156-2157,2159-2161,2163-2164,2172-2184,2186,2206-2208,2234,2239-2241,2243-2244
+  s_095936ed0adcb1::t_b91377e0a51fa4 14,145-156,189-190,321,328-349
+  s_889169a16310fa::t_03c6962f110ab4 50,244,402-417,419-421,423-428,1692-1711
+  s_aae70c89b6d9de::t_56f44e44c9ab37 138,795-796,882-883
+  s_4083bdc10397b0::t_afcf1b82d67005 245-246,547,559-682
+app/src/main/res/values/styles.xml
+  s_9834e2a403c222::t_f75bd29b0005e3 1-8
+app/src/main/res/drawable/ic_launcher.xml
+  s_9834e2a403c222::t_68b95fbd24f9d7 1-9
+README.md
+  s_9834e2a403c222::t_d3fa7ccc82ef6a 1-55
+  s_ca8c34497641e6::t_c30b21dc284f1d 56
+  s_ca8c34497641e6::t_2fbd8434b1a9c7 57-61
+context/njord-android-native-port.md
+  s_5e04332782000b::t_6f2bd79647ebfb 43-46,65-68
+  s_889169a16310fa::t_7d47c25fe5aa35 42
+  s_4083bdc10397b0::t_27f09f9669227a 37-40
+  s_9834e2a403c222::t_7cf3a7e6b8e651 22-24
+  s_503afb04ddb1a8::t_56f4e613565851 30-32
+  s_503afb04ddb1a8::t_37caa08e2d25d4 29
+  s_095936ed0adcb1::t_b1b54f64fe4305 25-28
+  s_9834e2a403c222::t_d3fa7ccc82ef6a 1-21,47-64
+  s_889169a16310fa::t_d50201b0e61846 33-36
+  s_889169a16310fa::t_763d2999edd040 41
+app/src/main/AndroidManifest.xml
+  s_889169a16310fa::t_6ac4f35d811462 2-3
+  s_9834e2a403c222::t_62b79edd49a7c8 6,8
+  s_9834e2a403c222::t_f75bd29b0005e3 1,4-5,7,9-20
+gradle.properties
+  s_9834e2a403c222::t_f75bd29b0005e3 1-2,4-5
+  s_9834e2a403c222::t_7fe86db48c9843 3
+gradle/libs.versions.toml
+  s_9834e2a403c222::t_f75bd29b0005e3 1-30
+gradlew
+  s_9834e2a403c222::t_f75bd29b0005e3 1-18
+app/src/main/java/com/njord/mobile/model/NjordMockData.kt
+  s_9834e2a403c222::t_9173fd0850a43c 1-17,21-33,37-45,49-57,61-167
+  s_95a32a73aef8eb::t_a0739213468b64 18-20
+  s_ca8c34497641e6::t_98b72933210716 34-36,46-48,58-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "9965d2b06fc17ca9ec7d18a7e6743c26d806bf79",
+  "prompts": {},
+  "sessions": {
+    "s_095936ed0adcb1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eae54-990c-7eb0-a180-661d208143df",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_4083bdc10397b0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb190-e509-7db0-8f78-bef2ea05e045",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_503afb04ddb1a8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb147-c105-7553-b8f7-84a5f921dea0",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_5e04332782000b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb195-aec2-7140-a18b-fedad90af317",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_889169a16310fa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb161-c17f-7072-82f0-3515a822602a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_95a32a73aef8eb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb373-db51-7182-9355-b3e4eb369e76",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_9834e2a403c222": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ead95-3ac2-7b03-85fa-5ef47055f1d4",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_aae70c89b6d9de": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb342-b9dc-71e0-9aa0-01a18932ecea",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_ca8c34497641e6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eae6f-1d46-77e0-bc94-42e47e6a7c5e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
