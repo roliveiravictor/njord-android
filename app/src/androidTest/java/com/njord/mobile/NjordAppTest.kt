@@ -30,6 +30,7 @@ class NjordAppTest {
         compose.onNodeWithText("Activity").assertIsDisplayed()
         compose.onNodeWithText("Candle close").assertIsDisplayed()
         compose.onNodeWithText("Heartbeat").assertIsDisplayed()
+        compose.onNodeWithText("Current health").assertIsDisplayed()
         compose.onNodeWithText("Incidents").assertIsDisplayed()
         compose.onNodeWithText("3 active").assertIsDisplayed()
     }
@@ -120,8 +121,9 @@ class NjordAppTest {
 
         compose.onNodeWithTag("screen-Heartbeat").assertIsDisplayed()
         compose.onNodeWithTag("heartbeatHealthCard").assertIsDisplayed()
+        compose.onAllNodesWithText("8 concrete Njord service routines").assertCountEquals(0)
         compose.onNodeWithText("HEARTBEAT HEALTH").assertIsDisplayed()
-        compose.onNodeWithText("7 / 8 healthy").assertIsDisplayed()
+        compose.onNodeWithText("7 / 8").assertIsDisplayed()
         compose.onNodeWithText("7 OK").assertIsDisplayed()
         compose.onNodeWithText("1 late").assertIsDisplayed()
         compose.onNodeWithText("0 critical").assertIsDisplayed()
@@ -202,6 +204,8 @@ class NjordAppTest {
     fun logsSearch_emptyStateAppears() {
         compose.onNodeWithTag("nav-More").performClick()
         compose.onNodeWithTag("more-Logs").performClick()
+        compose.onAllNodesWithText("Latest logs").assertCountEquals(0)
+        compose.onAllNodesWithText("Last 24h").assertCountEquals(0)
         compose.onNodeWithTag("logSearch").performTextInput("not a real njord log")
 
         compose.onNodeWithTag("emptyLogs").assertIsDisplayed()
@@ -218,6 +222,9 @@ class NjordAppTest {
         compose.onAllNodesWithText("SIZE")[0].assertIsDisplayed()
         compose.onAllNodesWithText("CAPITAL")[0].assertIsDisplayed()
         compose.onNodeWithText("Open P&L by strategy").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("+$428").assertIsDisplayed()
+        compose.onAllNodesWithText("Open positions only").assertCountEquals(0)
+        compose.onAllNodesWithText("+$428 total").assertCountEquals(0)
         compose.onNodeWithText("Live summary").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Position integrity").performScrollTo().assertIsDisplayed()
     }

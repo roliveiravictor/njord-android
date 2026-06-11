@@ -243,6 +243,8 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 state.destination != Destination.Live &&
                 state.destination != Destination.More &&
                 state.destination != Destination.Activity &&
+                state.destination != Destination.Heartbeat &&
+                state.destination != Destination.Logs &&
                 state.destination != Destination.Reports
             ) {
                 item {
@@ -503,11 +505,12 @@ private fun HeartbeatScreen() {
 @Composable
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val logs = visibleLogs(NjordMockData.logs, state.logFilter, state.logQuery)
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Latest logs", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Last 24h", color = TextMuted, fontSize = 12.sp)
-        }
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp)
+            .padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         TextField(
             value = state.logQuery,
             onValueChange = { onAction(NjordAction.SetLogQuery(it)) },
@@ -982,15 +985,18 @@ private fun HomeStrategyCard(summary: StrategySummary, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(summary.name, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(4.dp))
-                Text(summary.subtitle, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 summary.assets?.let { assets ->
                     Spacer(Modifier.height(5.dp))
                     Text(assets, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
+                Spacer(Modifier.height(7.dp))
+                Text(summary.subtitle, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                SmallLiveDot()
                 if (summary.pnl.isNotBlank() || summary.pct.isNotBlank()) {
-                    Spacer(Modifier.height(20.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
+                    Spacer(Modifier.height(28.dp))
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
                         Text(summary.pnl, color = Success, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
                         if (summary.pct.isNotBlank()) {
                             Spacer(Modifier.width(7.dp))
@@ -999,7 +1005,6 @@ private fun HomeStrategyCard(summary: StrategySummary, onClick: () -> Unit) {
                     }
                 }
             }
-            SmallLiveDot()
         }
     }
 }
@@ -1053,7 +1058,7 @@ private fun HomeHeartbeatCard(onClick: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Heartbeat health", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Current health", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(3.dp))
                 Text("Weekly performance report late", color = TextMuted, fontSize = 13.sp)
             }
@@ -1276,23 +1281,24 @@ private fun LiveFilterPill(
 @Composable
 private fun LivePositionCard(position: LivePosition, onClick: () -> Unit) {
     val tone = if (position.pnl.startsWith("-")) Tone.Danger else Tone.Success
+    val side = position.side.lowercase().replaceFirstChar { it.titlecase() }
     LiveCard(Modifier.testTag("livePosition-${position.symbol}"), onClick = onClick) {
         Row(verticalAlignment = Alignment.Top) {
-            CoinIcon(position.symbol, tone)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CoinIcon(position.symbol, tone)
+                Spacer(Modifier.height(7.dp))
+                Badge(side, if (side == "Short") Tone.Danger else Tone.Success)
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        position.symbol,
-                        color = TextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Badge(position.side, if (position.side == "Short") Tone.Danger else Tone.Success)
-                }
+                Text(
+                    position.symbol,
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     "${position.strategyName} · ${position.opened} open",
                     color = TextMuted,
@@ -1376,10 +1382,7 @@ private fun LiveAnalyticsSections() {
     NjordCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Text("Current contribution", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-            Column(horizontalAlignment = Alignment.End) {
-                Text("Open positions only", color = TextMuted, fontSize = 12.sp)
-                Text("+$428 total", color = TextPrimary, fontSize = 12.sp)
-            }
+            Text("+$428", color = Success, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
         }
         Spacer(Modifier.height(16.dp))
         LiveContributionRow("Big Bang", 0.82f, "+$303", Tone.Success)
@@ -1489,20 +1492,34 @@ private fun LiveContributionRow(strategy: String, progress: Float, value: String
 
 @Composable
 private fun LiveMetricTile(label: String, value: String, subtext: String, tone: Tone, modifier: Modifier = Modifier) {
+    val isPositive = value.startsWith("+")
+    val valueColor = when {
+        isPositive -> Success
+        value.startsWith("-") -> Danger
+        else -> toneColor(tone)
+    }
     Column(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 84.dp)
+            .heightIn(min = 96.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (tone == Tone.Primary) PrimaryContainer.copy(alpha = 0.45f) else Surface3.copy(alpha = 0.78f))
-            .border(1.dp, if (tone == Tone.Primary) Primary.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.07f), RoundedCornerShape(18.dp))
-            .padding(horizontal = 10.dp, vertical = 11.dp)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        Color(0xFF23303A),
+                        Color(0xFF1B252E),
+                        Color(0xFF171D25)
+                    )
+                )
+            )
+            .border(1.dp, Primary.copy(alpha = 0.30f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 13.dp)
     ) {
-        Text(label, color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(6.dp))
-        Text(value, color = toneColor(tone), fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(2.dp))
-        Text(subtext, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(9.dp))
+        Text(value, color = valueColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(4.dp))
+        Text(subtext, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1583,9 +1600,9 @@ private fun HeartbeatHealthCard() {
         Text(
             "HEARTBEAT HEALTH",
             color = TextMuted2,
-            fontSize = 17.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 2.6.sp
+            letterSpacing = 2.4.sp
         )
         Spacer(Modifier.height(8.dp))
         Row(
@@ -1593,9 +1610,9 @@ private fun HeartbeatHealthCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "7 / 8 healthy",
+                "7 / 8",
                 color = TextPrimary,
-                fontSize = 39.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
@@ -1618,7 +1635,7 @@ private fun HeartbeatStatusPill(label: String, tone: Tone) {
             .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(999.dp))
             .padding(horizontal = 16.dp, vertical = 9.dp)
     ) {
-        Text(label, color = toneColor(tone), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+        Text(label, color = toneColor(tone), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -1628,11 +1645,11 @@ private fun HeartbeatRow(routine: HeartbeatRoutine) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 132.dp)
+            .heightIn(min = 112.dp)
             .clip(shape)
             .background(Surface1)
             .border(1.dp, Outline.copy(alpha = 0.78f), shape)
-            .padding(horizontal = 30.dp, vertical = 24.dp)
+            .padding(horizontal = 28.dp, vertical = 20.dp)
             .testTag("heartbeatRoutine-${routine.name}")
     ) {
         Row(
@@ -1643,16 +1660,16 @@ private fun HeartbeatRow(routine: HeartbeatRoutine) {
                 Text(
                     routine.name,
                     color = TextPrimary,
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
                 Text(
                     routine.age,
                     color = TextMuted,
-                    fontSize = 20.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
