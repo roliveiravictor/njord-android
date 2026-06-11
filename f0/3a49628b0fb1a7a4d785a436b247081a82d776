@@ -1,0 +1,25 @@
+app/src/androidTest/java/com/njord/mobile/NjordAppTest.kt
+  s_95a32a73aef8eb::t_e82691fe6e96d3 124,126
+  s_95a32a73aef8eb::t_3b54eef60843e1 33,207-208,225-227
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_95a32a73aef8eb::t_8cef7f06945c6c 246,1613
+  s_95a32a73aef8eb::t_088f2f9ac4deba 247,508-513,992-996,998-999,1061,1284,1287-1291,1294-1301,1385
+  s_95a32a73aef8eb::t_cbad0cbdb99058 1603,1605,1615,1638,1648,1652,1663,1668,1672
+  s_95a32a73aef8eb::t_0660d2e04c0f55 1495-1500,1504,1506-1516,1518-1522
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f03a49628b0fb1a7a4d785a436b247081a82d776",
+  "prompts": {},
+  "sessions": {
+    "s_95a32a73aef8eb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eb373-db51-7182-9355-b3e4eb369e76",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
