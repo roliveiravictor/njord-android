@@ -102,12 +102,18 @@ import com.njord.mobile.model.LogFilter
 import com.njord.mobile.model.MiniKpi
 import com.njord.mobile.model.NjordAction
 import com.njord.mobile.api.HeartbeatResult
+import com.njord.mobile.api.HomeResult
 import com.njord.mobile.api.HunchReportResult
 import com.njord.mobile.api.LogsResult
 import com.njord.mobile.api.NjordApiClient
+import com.njord.mobile.api.ActivityResult
+import com.njord.mobile.api.mapApiActivity
 import com.njord.mobile.api.mapApiHeartbeat
+import com.njord.mobile.api.mapApiHome
 import com.njord.mobile.api.mapApiReport
 import com.njord.mobile.api.mapApiEntries
+import com.njord.mobile.model.ActivitySummary
+import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.HunchReport
 import com.njord.mobile.model.NjordMockData
 import com.njord.mobile.model.NjordUiState
@@ -139,9 +145,9 @@ private val TextPrimary = Color(0xFFE7ECF3)
 private val TextMuted = Color(0xFFB2BBC7)
 private val TextMuted2 = Color(0xFF8792A1)
 private val Outline = Color(0xFF2C3441)
-private val Success = Color(0xFF6EE7A8)
+private val Success = Color(0xFF00E676)
 private val Warning = Color(0xFFFFD166)
-private val Danger = Color(0xFFFF7F9A)
+private val Danger = Color(0xFFFF2D55)
 private val Info = Color(0xFF9CB7FF)
 private val PortfolioTileSurface = Color(0xFF171C24)
 private val LiveFilterSurface = Color(0xFF15171B)
@@ -265,7 +271,7 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 Destination.Live -> item { LiveScreen(state, onAction) }
                 Destination.Risk -> item { RiskScreen() }
                 Destination.More -> item { MoreScreen(onAction) }
-                Destination.Activity -> item { ActivityScreen() }
+                Destination.Activity -> item { ActivityScreen(state, onAction) }
                 Destination.Heartbeat -> item { HeartbeatScreen(state, onAction) }
                 Destination.Logs -> item { LogsScreen(state, onAction) }
                 Destination.Reports -> item { ReportsScreen(state, onAction) }
@@ -303,19 +309,45 @@ private fun ScreenHeader(destination: Destination) {
 
 @Composable
 private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    LaunchedEffect(Unit) {
+        onAction(NjordAction.HomeLoading)
+        val result = withContext(Dispatchers.IO) {
+            NjordApiClient.fetchHome(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )
+        }
+        when (result) {
+            is HomeResult.Success -> onAction(NjordAction.HomeLoaded(mapApiHome(result.response)))
+            is HomeResult.Error -> onAction(NjordAction.HomeError)
+            else -> {}
+        }
+    }
+
+    val snapshot = state.homeSnapshot
+
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HomeEquityHero { onAction(NjordAction.Navigate(Destination.Portfolio)) }
+        HomeEquityHero(snapshot, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Portfolio)) }
+        if (state.homeError) {
+            ApiErrorCard("Could not load home data.")
+        }
 
         SectionTitle("Strategies")
-        NjordMockData.strategySummaries.forEach {
+        val strategies = snapshot?.strategies.orEmpty()
+        if (state.homeLoading && strategies.isEmpty()) {
+            NjordCard { Text("Loading strategies…", color = TextMuted, fontSize = 13.sp) }
+        } else if (!state.homeError && strategies.isEmpty()) {
+            NjordCard { Text("No strategy data available yet.", color = TextMuted, fontSize = 13.sp) }
+        }
+        strategies.forEach {
             HomeStrategyCard(it) { onAction(NjordAction.Navigate(Destination.Live)) }
         }
 
         SectionTitle("Activity")
-        HomeActivityCard { onAction(NjordAction.Navigate(Destination.Activity)) }
+        HomeActivityCard(snapshot?.activitySummary, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Activity)) }
 
         SectionTitle("Heartbeat")
-        HomeHeartbeatCard { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
+        HomeHeartbeatCard(snapshot, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
 
         SectionTitle("Incidents")
         HomeIncidentsCard(
@@ -441,8 +473,24 @@ private fun MoreScreen(onAction: (NjordAction) -> Unit) {
 }
 
 @Composable
-private fun ActivityScreen() {
-    val summary = NjordMockData.activitySummary
+private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    LaunchedEffect(Unit) {
+        onAction(NjordAction.ActivityLoading)
+        val result = withContext(Dispatchers.IO) {
+            NjordApiClient.fetchActivity(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )
+        }
+        when (result) {
+            is ActivityResult.Success -> {
+                val (summary, cycles) = mapApiActivity(result.response)
+                onAction(NjordAction.ActivityLoaded(summary, cycles))
+            }
+            is ActivityResult.Error -> onAction(NjordAction.ActivityError)
+            else -> {}
+        }
+    }
 
     Column(
         Modifier
@@ -450,19 +498,17 @@ private fun ActivityScreen() {
             .padding(top = 6.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(Surface1)
-                .border(BorderStroke(1.dp, Outline.copy(alpha = 0.76f)), RoundedCornerShape(24.dp))
-                .padding(horizontal = 18.dp, vertical = 18.dp)
-                .testTag("activityReferencePanel")
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        if (state.activityError) {
+            ApiErrorCard("Could not load activity data.")
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Surface1)
+                    .border(BorderStroke(1.dp, Outline.copy(alpha = 0.76f)), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+                    .testTag("activityReferencePanel")
             ) {
                 Text(
                     "Candle close",
@@ -470,20 +516,28 @@ private fun ActivityScreen() {
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-            }
-
-            Spacer(Modifier.height(18.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActivitySummaryChip("+${summary.opened}", "Opened")
-                ActivitySummaryChip("-${summary.closed}", "Closed")
-                ActivitySummaryChip("•${summary.kept}", "Kept")
-            }
-
-            Spacer(Modifier.height(18.dp))
-            HorizontalDivider(color = Outline.copy(alpha = 0.85f))
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                NjordMockData.cycles.forEachIndexed { index, cycle ->
-                    ActivityCycleTable(cycle, isLast = index == NjordMockData.cycles.lastIndex)
+                Spacer(Modifier.height(18.dp))
+                val summary = state.activitySummary
+                if (state.activityLoading || summary == null) {
+                    Text("Loading activity…", color = TextMuted, fontSize = 13.sp)
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ActivitySummaryChip("+${summary.opened}", "Opened")
+                        ActivitySummaryChip("-${summary.closed}", "Closed")
+                        ActivitySummaryChip("•${summary.kept}", "Kept")
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    HorizontalDivider(color = Outline.copy(alpha = 0.85f))
+                    if (state.activityCycles.isEmpty()) {
+                        Spacer(Modifier.height(18.dp))
+                        Text("No cycle data available yet.", color = TextMuted, fontSize = 13.sp)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                            state.activityCycles.forEachIndexed { index, cycle ->
+                                ActivityCycleTable(cycle, isLast = index == state.activityCycles.lastIndex)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -525,27 +579,41 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
             .padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        HeartbeatHealthCard(
-            healthyCount = state.heartbeatHealthyCount,
-            lateCount = state.heartbeatLateCount,
-            criticalCount = state.heartbeatCriticalCount,
-            totalCount = state.heartbeatTotalCount
-        )
-        Text(
-            "Service routines",
-            color = TextPrimary,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(top = 18.dp, bottom = 4.dp, start = 4.dp)
-        )
-        state.heartbeatRoutines.forEach { HeartbeatRow(it) }
+        when {
+            state.heartbeatLoading -> {
+                NjordCard { Text("Loading heartbeat…", color = TextMuted, fontSize = 13.sp) }
+            }
+            state.heartbeatError -> {
+                ApiErrorCard("Could not load heartbeat data.")
+            }
+            else -> {
+                HeartbeatHealthCard(
+                    healthyCount = state.heartbeatHealthyCount,
+                    lateCount = state.heartbeatLateCount,
+                    criticalCount = state.heartbeatCriticalCount,
+                    totalCount = state.heartbeatTotalCount
+                )
+                Text(
+                    "Service routines",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(top = 18.dp, bottom = 4.dp, start = 4.dp)
+                )
+                state.heartbeatRoutines.forEach { HeartbeatRow(it) }
+            }
+        }
     }
 }
 
 @Composable
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val logs = visibleLogs(state.logs, state.logFilter, state.logQuery)
-    var expandedLogKey by remember(logs) { mutableStateOf<String?>(null) }
+    var expandedLogKey by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.logs, state.logFilter, state.logQuery) {
+        expandedLogKey = null
+    }
 
     LaunchedEffect(Unit) {
         onAction(NjordAction.LogsLoading)
@@ -634,34 +702,39 @@ private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) 
     val report = state.hunchReport
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (state.hunchReportLoading) {
-            NjordCard { Text("Loading Hunch report…", color = TextMuted) }
-        } else if (state.hunchReportError) {
-            NjordCard { Text("Could not load Hunch report. Showing cached sample.", color = Danger) }
-        }
-        ReportReferencePanel(report)
-        NjordCard {
-            Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            if (report.keyFactors.isEmpty()) {
-                Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-            } else {
-                report.keyFactors.forEach { ReportFactorRow(it) }
+        when {
+            state.hunchReportLoading -> {
+                NjordCard { Text("Loading Hunch report…", color = TextMuted) }
             }
-        }
-        NjordCard {
-            Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            if (report.risks.isEmpty()) {
-                Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-            } else {
-                report.risks.forEach { ReportFactorRow(it) }
+            state.hunchReportError || report == null -> {
+                ApiErrorCard("Could not load Hunch report.")
             }
-        }
-        NjordCard {
-            Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            if (report.layerScores.isEmpty()) {
-                Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-            } else {
-                report.layerScores.forEach { LayerScoreRow(it) }
+            else -> {
+                ReportReferencePanel(report)
+                NjordCard {
+                    Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                    if (report.keyFactors.isEmpty()) {
+                        Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                    } else {
+                        report.keyFactors.forEach { ReportFactorRow(it) }
+                    }
+                }
+                NjordCard {
+                    Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                    if (report.risks.isEmpty()) {
+                        Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                    } else {
+                        report.risks.forEach { ReportFactorRow(it) }
+                    }
+                }
+                NjordCard {
+                    Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                    if (report.layerScores.isEmpty()) {
+                        Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                    } else {
+                        report.layerScores.forEach { LayerScoreRow(it) }
+                    }
+                }
             }
         }
     }
@@ -856,7 +929,7 @@ private fun HeroCard(label: String, title: String, subtitle: String, footer: Lis
 }
 
 @Composable
-private fun HomeEquityHero(onClick: () -> Unit) {
+private fun HomeEquityHero(snapshot: HomeSnapshot?, loading: Boolean, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -866,19 +939,30 @@ private fun HomeEquityHero(onClick: () -> Unit) {
             .padding(22.dp)
             .testTag("homeEquityHero")
     ) {
-        Text("$18,420.00", color = TextPrimary, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+        Text(
+            snapshot?.totalEquity ?: if (loading) "Loading…" else "Unavailable",
+            color = TextPrimary,
+            fontSize = 38.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
         Text("Total Equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("+$428.00", color = Success, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            val pnl = snapshot?.unrealizedPnl ?: "--"
+            Text(
+                pnl,
+                color = if (pnl.startsWith("-")) Danger else Success,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
             Spacer(Modifier.width(8.dp))
-            Text("+3.8% unrealized", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(snapshot?.unrealizedPnlPct ?: "unrealized", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         HorizontalDivider(Modifier.padding(vertical = 18.dp), color = Color.White.copy(alpha = 0.1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            HomeHeroKpi("AVAILABLE", "$7.8K")
-            HomeHeroKpi("IN USE", "$3.1K")
-            HomeHeroKpi("OPEN", "18 Pos")
+            HomeHeroKpi("AVAILABLE", snapshot?.availableMargin ?: "--")
+            HomeHeroKpi("IN USE", snapshot?.inUse ?: "--")
+            HomeHeroKpi("OPEN", snapshot?.openPositionCount ?: "--")
         }
     }
 }
@@ -1086,6 +1170,7 @@ private fun KpiGrid(items: List<MiniKpi>) {
 @Composable
 private fun HomeStrategyCard(summary: StrategySummary, onClick: () -> Unit) {
     NjordCard(Modifier.testTag("homeStrategy-${summary.name}"), onClick = onClick) {
+        val pnlTone = if (summary.pnl.startsWith("-")) Danger else Success
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(summary.name, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
@@ -1101,10 +1186,10 @@ private fun HomeStrategyCard(summary: StrategySummary, onClick: () -> Unit) {
                 if (summary.pnl.isNotBlank() || summary.pct.isNotBlank()) {
                     Spacer(Modifier.height(28.dp))
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
-                        Text(summary.pnl, color = Success, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(summary.pnl, color = pnlTone, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
                         if (summary.pct.isNotBlank()) {
                             Spacer(Modifier.width(7.dp))
-                            Text(summary.pct, color = Success, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(summary.pct, color = pnlTone, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }
@@ -1132,22 +1217,45 @@ private fun StrategyCard(summary: StrategySummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeActivityCard(onClick: () -> Unit) {
+private fun HomeActivityCard(summary: ActivitySummary?, loading: Boolean, onClick: () -> Unit) {
     NjordCard(Modifier.testTag("homeActivityCard"), onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Candle close", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeCyclePill("OPENED", NjordMockData.activitySummary.opened, Modifier.weight(1f))
-            HomeCyclePill("CLOSED", NjordMockData.activitySummary.closed, Modifier.weight(1f))
-            HomeCyclePill("KEPT", NjordMockData.activitySummary.kept, Modifier.weight(1f))
+        if (loading && summary == null) {
+            Text("Loading latest cycle…", color = TextMuted, fontSize = 13.sp)
+        } else if (summary == null) {
+            Text("No candle-close cycle available yet.", color = TextMuted, fontSize = 13.sp)
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeCyclePill("OPENED", summary.opened, Modifier.weight(1f))
+                HomeCyclePill("CLOSED", summary.closed, Modifier.weight(1f))
+                HomeCyclePill("KEPT", summary.kept, Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-private fun HomeHeartbeatCard(onClick: () -> Unit) {
+private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, loading: Boolean, onClick: () -> Unit) {
+    val healthy = snapshot?.heartbeatHealthy ?: 0
+    val total = snapshot?.heartbeatTotal ?: 0
+    val lateCount = snapshot?.heartbeatLateCount ?: 0
+    val subtitle = when {
+        loading && snapshot == null -> "Loading service health…"
+        total == 0 -> "No service health available"
+        lateCount == 0 -> "All monitored routines healthy"
+        lateCount == 1 -> "1 routine late"
+        else -> "$lateCount routines late"
+    }
+    val badge = when {
+        loading && snapshot == null -> "Loading"
+        lateCount == 0 -> "OK"
+        lateCount == 1 -> "1 late"
+        else -> "$lateCount late"
+    }
+    val badgeTone = if (lateCount == 0 && total > 0) Tone.Success else Tone.Warning
     HomeGradientCard(
         modifier = Modifier.testTag("homeHeartbeatCard"),
         gradient = Brush.linearGradient(
@@ -1164,11 +1272,11 @@ private fun HomeHeartbeatCard(onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text("Current health", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(3.dp))
-                Text("Weekly performance report late", color = TextMuted, fontSize = 13.sp)
+                Text(subtitle, color = TextMuted, fontSize = 13.sp)
             }
-            Text("7/8", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            Text("$healthy/$total", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.width(8.dp))
-            Badge("1 late", Tone.Warning)
+            Badge(badge, badgeTone)
         }
     }
 }
@@ -2205,6 +2313,25 @@ private fun PositionSheet(position: LivePosition, onClose: () -> Unit) {
         SummaryLine("Entry", position.entry, Tone.Muted)
         SummaryLine("Current", position.current, if (position.trendUp) Tone.Success else Tone.Danger)
         Spacer(Modifier.height(18.dp))
+    }
+}
+
+@Composable
+private fun ApiErrorCard(message: String) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Danger.copy(alpha = 0.07f))
+            .border(1.dp, Danger.copy(alpha = 0.30f), shape)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Text("Failed to load", color = Danger, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(message, color = TextMuted, fontSize = 13.sp)
+        Spacer(Modifier.height(2.dp))
+        Text("Check your connection and try again.", color = TextMuted2, fontSize = 12.sp)
     }
 }
 

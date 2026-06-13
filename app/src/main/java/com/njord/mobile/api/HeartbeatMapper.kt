@@ -22,16 +22,21 @@ internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Ins
         lateCount = result.lateCount,
         criticalCount = result.criticalCount,
         totalCount = result.totalCount,
-        routines = result.services.map { service ->
-            HeartbeatRoutine(
-                name = service.displayName ?: service.name,
-                status = service.status.toHeartbeatLabel(),
-                age = service.lastSeenAt.toAgeLabel(now),
-                cadence = service.expectedCadenceSeconds.toCadenceLabel(),
-                tone = service.status.toHeartbeatTone()
-            )
-        }
+        routines = result.services
+            .sortedBy { service -> service.status.toHeartbeatSortRank() }
+            .map { service ->
+                HeartbeatRoutine(
+                    name = service.displayName ?: service.name,
+                    status = service.status.toHeartbeatLabel(),
+                    age = service.lastSeenAt.toAgeLabel(now),
+                    cadence = service.expectedCadenceSeconds.toCadenceLabel(),
+                    tone = service.status.toHeartbeatTone()
+                )
+            }
     )
+
+private fun String.toHeartbeatSortRank(): Int =
+    if (equals("healthy", ignoreCase = true)) 0 else 1
 
 private fun String.toHeartbeatLabel(): String =
     when (lowercase()) {

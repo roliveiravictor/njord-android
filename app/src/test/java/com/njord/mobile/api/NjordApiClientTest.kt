@@ -17,6 +17,13 @@ class NjordApiClientTest {
         """{"level":"$level","title":"$title","message":"$message","timestamp":"$timestamp","strategy":null,"symbol":null}"""
 
     @Test
+    fun logsUrl_requestsFullServerPageForLatest24Hours() {
+        val url = NjordApiClient.logsUrl("https://noatun.dev")
+
+        assertEquals("https://noatun.dev/v1/logs?hours=24&limit=5000", url)
+    }
+
+    @Test
     fun parseLogsResponse_wellFormedJson_returnsSuccessWithEntries() {
         val json = makeValidJson(
             makeEntry("INFO", "hyperliquid.wcr", "Rebalance complete", "2026-06-12T14:23:01"),
@@ -60,6 +67,111 @@ class NjordApiClientTest {
         val result = NjordApiClient.parseLogsResponse(json)
 
         assertTrue(result is LogsResult.Error)
+    }
+
+    @Test
+    fun parseHomeResponse_wellFormedJson_returnsSuccessWithoutMappingIncidents() {
+        val json = """
+            {
+              "total_equity": 18420.0,
+              "available_margin": 7800.0,
+              "in_use": 3100.0,
+              "open_position_count": 18,
+              "unrealized_pnl": 428.0,
+              "unrealized_pnl_pct": 3.8,
+              "strategies": [
+                {
+                  "name": "Big Bang",
+                  "is_live": true,
+                  "position_count": 2,
+                  "symbols": ["HYPE", "ETH"],
+                  "unrealized_pnl": 212.0,
+                  "unrealized_pnl_pct": 4.1
+                }
+              ],
+              "latest_cycle": {
+                "timestamp": "2026-06-12T14:00:00",
+                "opened_count": 2,
+                "closed_count": 1,
+                "kept_count": 15
+              },
+              "heartbeat": {
+                "healthy": 7,
+                "total": 8,
+                "late_count": 1
+              },
+              "incidents": [
+                {
+                  "timestamp": "2026-06-12T14:00:00",
+                  "level": "error",
+                  "category": "order",
+                  "title": "Remote incident",
+                  "message": "Ignored by Android home for now"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHomeResponse(json)
+
+        assertTrue(result is HomeResult.Success)
+        val response = (result as HomeResult.Success).response
+        assertEquals(18420.0, response.totalEquity, 0.0001)
+        assertEquals(1, response.strategies.size)
+        assertEquals("Big Bang", response.strategies[0].name)
+        assertEquals(listOf("HYPE", "ETH"), response.strategies[0].symbols)
+        assertEquals(2, response.latestCycle?.openedCount)
+        assertEquals(7, response.heartbeat.healthy)
+        assertEquals(8, response.heartbeat.total)
+    }
+
+    @Test
+    fun parseHomeResponse_missingHeartbeat_returnsError() {
+        val result = NjordApiClient.parseHomeResponse("""{"strategies":[]}""")
+
+        assertTrue(result is HomeResult.Error)
+    }
+
+    @Test
+    fun mapApiHome_formatsSnapshotForHomeCards() {
+        val response = HomeApiResponse(
+            totalEquity = 18420.0,
+            availableMargin = 7800.0,
+            inUse = 3100.0,
+            openPositionCount = 18,
+            unrealizedPnl = -428.0,
+            unrealizedPnlPct = -3.8,
+            strategies = listOf(
+                HomeApiStrategy(
+                    name = "WCR",
+                    isLive = true,
+                    positionCount = 3,
+                    symbols = listOf("HYPE", "BTC", "ETH"),
+                    unrealizedPnl = 184.0,
+                    unrealizedPnlPct = 2.6
+                )
+            ),
+            latestCycle = HomeApiCycle(
+                timestamp = "2026-06-12T14:00:00",
+                openedCount = 2,
+                closedCount = 1,
+                keptCount = 15
+            ),
+            heartbeat = HomeApiHeartbeat(healthy = 7, total = 8, lateCount = 1)
+        )
+
+        val snapshot = mapApiHome(response)
+
+        assertEquals("\$18,420.00", snapshot.totalEquity)
+        assertEquals("-\$428.00", snapshot.unrealizedPnl)
+        assertEquals("-3.8% unrealized", snapshot.unrealizedPnlPct)
+        assertEquals("\$7.8K", snapshot.availableMargin)
+        assertEquals("\$3.1K", snapshot.inUse)
+        assertEquals("18 Pos", snapshot.openPositionCount)
+        assertEquals("2", snapshot.activitySummary?.opened)
+        assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
+        assertEquals("+\$184.00", snapshot.strategies[0].pnl)
+        assertEquals("+2.6%", snapshot.strategies[0].pct)
     }
 
     @Test
@@ -189,6 +301,14 @@ class NjordApiClientTest {
             totalCount = 8,
             services = listOf(
                 HeartbeatApiService(
+                    name = "database_snapshot",
+                    displayName = "Database snapshot",
+                    status = "unknown",
+                    lastSeenAt = null,
+                    expectedCadenceSeconds = 1200,
+                    secondsOverdue = null
+                ),
+                HeartbeatApiService(
                     name = "vpn_heartbeat",
                     displayName = "VPN heartbeat",
                     status = "healthy",
@@ -217,7 +337,10 @@ class NjordApiClientTest {
         assertEquals("Healthy", snapshot.routines[0].status)
         assertEquals("3m ago", snapshot.routines[0].age)
         assertEquals("20m", snapshot.routines[0].cadence)
-        assertEquals("Late", snapshot.routines[1].status)
-        assertEquals("7d", snapshot.routines[1].cadence)
+        assertEquals("Database snapshot", snapshot.routines[1].name)
+        assertEquals("Unknown", snapshot.routines[1].status)
+        assertEquals("Never", snapshot.routines[1].age)
+        assertEquals("Late", snapshot.routines[2].status)
+        assertEquals("7d", snapshot.routines[2].cadence)
     }
 }

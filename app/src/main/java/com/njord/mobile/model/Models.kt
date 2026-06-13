@@ -57,16 +57,23 @@ data class NjordUiState(
     val logs: List<LogEntry> = emptyList(),
     val logsLoading: Boolean = false,
     val logsError: Boolean = false,
-    val heartbeatRoutines: List<HeartbeatRoutine> = NjordMockData.heartbeatRoutines,
-    val heartbeatHealthyCount: Int = 7,
-    val heartbeatLateCount: Int = 1,
+    val heartbeatRoutines: List<HeartbeatRoutine> = emptyList(),
+    val heartbeatHealthyCount: Int = 0,
+    val heartbeatLateCount: Int = 0,
     val heartbeatCriticalCount: Int = 0,
-    val heartbeatTotalCount: Int = 8,
+    val heartbeatTotalCount: Int = 0,
     val heartbeatLoading: Boolean = false,
     val heartbeatError: Boolean = false,
-    val hunchReport: HunchReport = NjordMockData.hunchReport,
+    val hunchReport: HunchReport? = null,
     val hunchReportLoading: Boolean = false,
     val hunchReportError: Boolean = false,
+    val homeSnapshot: HomeSnapshot? = null,
+    val homeLoading: Boolean = false,
+    val homeError: Boolean = false,
+    val activitySummary: ActivitySummary? = null,
+    val activityCycles: List<StrategyCycle> = emptyList(),
+    val activityLoading: Boolean = false,
+    val activityError: Boolean = false,
     val dismissedIncidentIds: Set<String> = emptySet(),
     val selectedIncident: Incident? = null,
     val selectedPosition: LivePosition? = null
@@ -84,6 +91,9 @@ sealed interface NjordAction {
     data class DismissIncident(val incidentId: String) : NjordAction
     data class SelectPosition(val position: LivePosition) : NjordAction
     data object ClosePosition : NjordAction
+    data object ActivityLoading : NjordAction
+    data class ActivityLoaded(val summary: ActivitySummary, val cycles: List<StrategyCycle>) : NjordAction
+    data object ActivityError : NjordAction
     data object LogsLoading : NjordAction
     data class LogsLoaded(val entries: List<LogEntry>) : NjordAction
     data object LogsError : NjordAction
@@ -99,6 +109,9 @@ sealed interface NjordAction {
     data object HunchReportLoading : NjordAction
     data class HunchReportLoaded(val report: HunchReport) : NjordAction
     data object HunchReportError : NjordAction
+    data object HomeLoading : NjordAction
+    data class HomeLoaded(val snapshot: HomeSnapshot) : NjordAction
+    data object HomeError : NjordAction
 }
 
 fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
@@ -123,6 +136,14 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
 
         is NjordAction.SelectPosition -> state.copy(selectedPosition = action.position)
         NjordAction.ClosePosition -> state.copy(selectedPosition = null)
+        NjordAction.ActivityLoading -> state.copy(activityLoading = true, activityError = false)
+        is NjordAction.ActivityLoaded -> state.copy(
+            activitySummary = action.summary,
+            activityCycles = action.cycles,
+            activityLoading = false,
+            activityError = false
+        )
+        NjordAction.ActivityError -> state.copy(activityLoading = false, activityError = true)
         NjordAction.LogsLoading -> state.copy(logsLoading = true, logsError = false)
         is NjordAction.LogsLoaded -> state.copy(logs = action.entries, logsLoading = false, logsError = false)
         NjordAction.LogsError -> state.copy(logsLoading = false, logsError = true)
@@ -144,6 +165,13 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
             hunchReportError = false
         )
         NjordAction.HunchReportError -> state.copy(hunchReportLoading = false, hunchReportError = true)
+        NjordAction.HomeLoading -> state.copy(homeLoading = true, homeError = false)
+        is NjordAction.HomeLoaded -> state.copy(
+            homeSnapshot = action.snapshot,
+            homeLoading = false,
+            homeError = false
+        )
+        NjordAction.HomeError -> state.copy(homeLoading = false, homeError = true)
     }
 
 fun visibleLivePositions(
@@ -174,6 +202,19 @@ fun visibleLogs(logs: List<LogEntry>, filter: LogFilter, query: String): List<Lo
 
 data class HeroKpi(val label: String, val value: String)
 data class MiniKpi(val label: String, val value: String, val subtext: String, val tone: Tone = Tone.Success)
+data class HomeSnapshot(
+    val totalEquity: String,
+    val unrealizedPnl: String,
+    val unrealizedPnlPct: String,
+    val availableMargin: String,
+    val inUse: String,
+    val openPositionCount: String,
+    val strategies: List<StrategySummary>,
+    val activitySummary: ActivitySummary?,
+    val heartbeatHealthy: Int,
+    val heartbeatTotal: Int,
+    val heartbeatLateCount: Int
+)
 data class StrategySummary(
     val name: String,
     val subtitle: String,
