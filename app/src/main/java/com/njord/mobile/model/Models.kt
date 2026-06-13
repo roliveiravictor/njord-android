@@ -54,6 +54,19 @@ data class NjordUiState(
     val portfolioStrategyFilter: StrategyFilter = StrategyFilter.All,
     val logFilter: LogFilter = LogFilter.All,
     val logQuery: String = "",
+    val logs: List<LogEntry> = emptyList(),
+    val logsLoading: Boolean = false,
+    val logsError: Boolean = false,
+    val heartbeatRoutines: List<HeartbeatRoutine> = NjordMockData.heartbeatRoutines,
+    val heartbeatHealthyCount: Int = 7,
+    val heartbeatLateCount: Int = 1,
+    val heartbeatCriticalCount: Int = 0,
+    val heartbeatTotalCount: Int = 8,
+    val heartbeatLoading: Boolean = false,
+    val heartbeatError: Boolean = false,
+    val hunchReport: HunchReport = NjordMockData.hunchReport,
+    val hunchReportLoading: Boolean = false,
+    val hunchReportError: Boolean = false,
     val dismissedIncidentIds: Set<String> = emptySet(),
     val selectedIncident: Incident? = null,
     val selectedPosition: LivePosition? = null
@@ -71,6 +84,21 @@ sealed interface NjordAction {
     data class DismissIncident(val incidentId: String) : NjordAction
     data class SelectPosition(val position: LivePosition) : NjordAction
     data object ClosePosition : NjordAction
+    data object LogsLoading : NjordAction
+    data class LogsLoaded(val entries: List<LogEntry>) : NjordAction
+    data object LogsError : NjordAction
+    data object HeartbeatLoading : NjordAction
+    data class HeartbeatLoaded(
+        val routines: List<HeartbeatRoutine>,
+        val healthyCount: Int,
+        val lateCount: Int,
+        val criticalCount: Int,
+        val totalCount: Int
+    ) : NjordAction
+    data object HeartbeatError : NjordAction
+    data object HunchReportLoading : NjordAction
+    data class HunchReportLoaded(val report: HunchReport) : NjordAction
+    data object HunchReportError : NjordAction
 }
 
 fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
@@ -95,6 +123,27 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
 
         is NjordAction.SelectPosition -> state.copy(selectedPosition = action.position)
         NjordAction.ClosePosition -> state.copy(selectedPosition = null)
+        NjordAction.LogsLoading -> state.copy(logsLoading = true, logsError = false)
+        is NjordAction.LogsLoaded -> state.copy(logs = action.entries, logsLoading = false, logsError = false)
+        NjordAction.LogsError -> state.copy(logsLoading = false, logsError = true)
+        NjordAction.HeartbeatLoading -> state.copy(heartbeatLoading = true, heartbeatError = false)
+        is NjordAction.HeartbeatLoaded -> state.copy(
+            heartbeatRoutines = action.routines,
+            heartbeatHealthyCount = action.healthyCount,
+            heartbeatLateCount = action.lateCount,
+            heartbeatCriticalCount = action.criticalCount,
+            heartbeatTotalCount = action.totalCount,
+            heartbeatLoading = false,
+            heartbeatError = false
+        )
+        NjordAction.HeartbeatError -> state.copy(heartbeatLoading = false, heartbeatError = true)
+        NjordAction.HunchReportLoading -> state.copy(hunchReportLoading = true, hunchReportError = false)
+        is NjordAction.HunchReportLoaded -> state.copy(
+            hunchReport = action.report,
+            hunchReportLoading = false,
+            hunchReportError = false
+        )
+        NjordAction.HunchReportError -> state.copy(hunchReportLoading = false, hunchReportError = true)
     }
 
 fun visibleLivePositions(
@@ -192,3 +241,21 @@ data class StrategyCycle(val strategy: String, val actions: List<ActivityAction>
 data class ChartPoint(val x: Float, val y: Float)
 data class ReportFactor(val text: String, val isRisk: Boolean = false)
 data class LayerScore(val name: String, val score: String, val tone: Tone)
+data class HunchReport(
+    val title: String,
+    val persistedAge: String,
+    val signal: String,
+    val signalTone: Tone,
+    val confidence: String,
+    val score: String,
+    val date: String,
+    val btcPriceAtSignal: String,
+    val currentBtcPrice: String,
+    val priceDelta: String,
+    val priceDeltaTone: Tone,
+    val wasSignalCorrect: String,
+    val wasSignalCorrectTone: Tone,
+    val keyFactors: List<ReportFactor>,
+    val risks: List<ReportFactor>,
+    val layerScores: List<LayerScore>
+)

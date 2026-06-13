@@ -60,4 +60,99 @@ class NjordReducerTest {
         assertEquals(position, state.selectedPosition)
         assertFalse(state.selectedPosition?.symbol.isNullOrBlank())
     }
+
+    @Test
+    fun logsLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(logsError = true), NjordAction.LogsLoading)
+
+        assertTrue(state.logsLoading)
+        assertFalse(state.logsError)
+    }
+
+    @Test
+    fun logsLoaded_replacesLogsListAndClearsLoading() {
+        val entry = LogEntry(level = LogFilter.Info, title = "hyperliquid.wcr", message = "ok", time = "14:23", searchText = "hyperliquid.wcr ok")
+        val state = reduce(NjordUiState(logsLoading = true), NjordAction.LogsLoaded(listOf(entry)))
+
+        assertEquals(listOf(entry), state.logs)
+        assertFalse(state.logsLoading)
+        assertFalse(state.logsError)
+    }
+
+    @Test
+    fun logsError_setsErrorTrueAndClearsLoading() {
+        val state = reduce(NjordUiState(logsLoading = true), NjordAction.LogsError)
+
+        assertTrue(state.logsError)
+        assertFalse(state.logsLoading)
+    }
+
+    @Test
+    fun hunchReportLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(hunchReportError = true), NjordAction.HunchReportLoading)
+
+        assertTrue(state.hunchReportLoading)
+        assertFalse(state.hunchReportError)
+    }
+
+    @Test
+    fun hunchReportLoaded_replacesReportAndClearsLoading() {
+        val report = NjordMockData.hunchReport.copy(signal = "BUY", confidence = "MEDIUM")
+        val state = reduce(NjordUiState(hunchReportLoading = true), NjordAction.HunchReportLoaded(report))
+
+        assertEquals(report, state.hunchReport)
+        assertFalse(state.hunchReportLoading)
+        assertFalse(state.hunchReportError)
+    }
+
+    @Test
+    fun hunchReportError_setsErrorTrueAndKeepsFallbackReport() {
+        val initial = NjordUiState(hunchReportLoading = true)
+        val state = reduce(initial, NjordAction.HunchReportError)
+
+        assertEquals(initial.hunchReport, state.hunchReport)
+        assertTrue(state.hunchReportError)
+        assertFalse(state.hunchReportLoading)
+    }
+
+    @Test
+    fun heartbeatLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(heartbeatError = true), NjordAction.HeartbeatLoading)
+
+        assertTrue(state.heartbeatLoading)
+        assertFalse(state.heartbeatError)
+    }
+
+    @Test
+    fun heartbeatLoaded_replacesRoutinesAndCounts() {
+        val routine = HeartbeatRoutine("VPN heartbeat", "Healthy", "1m ago", "20m", Tone.Success)
+        val state = reduce(
+            NjordUiState(heartbeatLoading = true),
+            NjordAction.HeartbeatLoaded(
+                routines = listOf(routine),
+                healthyCount = 1,
+                lateCount = 2,
+                criticalCount = 3,
+                totalCount = 6
+            )
+        )
+
+        assertEquals(listOf(routine), state.heartbeatRoutines)
+        assertEquals(1, state.heartbeatHealthyCount)
+        assertEquals(2, state.heartbeatLateCount)
+        assertEquals(3, state.heartbeatCriticalCount)
+        assertEquals(6, state.heartbeatTotalCount)
+        assertFalse(state.heartbeatLoading)
+        assertFalse(state.heartbeatError)
+    }
+
+    @Test
+    fun heartbeatError_setsErrorTrueAndKeepsFallbackRoutines() {
+        val initial = NjordUiState(heartbeatLoading = true)
+        val state = reduce(initial, NjordAction.HeartbeatError)
+
+        assertEquals(initial.heartbeatRoutines, state.heartbeatRoutines)
+        assertTrue(state.heartbeatError)
+        assertFalse(state.heartbeatLoading)
+    }
 }

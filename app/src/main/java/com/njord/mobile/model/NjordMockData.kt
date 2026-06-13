@@ -164,4 +164,23 @@ object NjordMockData {
         LayerScore("Sentiment", "0.00", Tone.Muted),
         LayerScore("Seasonality", "0.00", Tone.Muted)
     )
+
+    val hunchReport = HunchReport(
+        title = "Hunch BTC Signal - 2026-06-08",
+        persistedAge = "Persisted 18m ago",
+        signal = "SELL",
+        signalTone = Tone.Danger,
+        confidence = "HIGH",
+        score = "-0.523",
+        date = "2026-06-07",
+        btcPriceAtSignal = "$62,215.00",
+        currentBtcPrice = "$63,193.50",
+        priceDelta = "+1.57%",
+        priceDeltaTone = Tone.Success,
+        wasSignalCorrect = "NO",
+        wasSignalCorrectTone = Tone.Danger,
+        keyFactors = reportFactors.filterNot { it.isRisk },
+        risks = reportFactors.filter { it.isRisk },
+        layerScores = layerScores
+    )
 }

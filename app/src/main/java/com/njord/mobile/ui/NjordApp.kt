@@ -101,6 +101,14 @@ import com.njord.mobile.model.LogEntry
 import com.njord.mobile.model.LogFilter
 import com.njord.mobile.model.MiniKpi
 import com.njord.mobile.model.NjordAction
+import com.njord.mobile.api.HeartbeatResult
+import com.njord.mobile.api.HunchReportResult
+import com.njord.mobile.api.LogsResult
+import com.njord.mobile.api.NjordApiClient
+import com.njord.mobile.api.mapApiHeartbeat
+import com.njord.mobile.api.mapApiReport
+import com.njord.mobile.api.mapApiEntries
+import com.njord.mobile.model.HunchReport
 import com.njord.mobile.model.NjordMockData
 import com.njord.mobile.model.NjordUiState
 import com.njord.mobile.model.PortfolioPosition
@@ -258,9 +266,9 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 Destination.Risk -> item { RiskScreen() }
                 Destination.More -> item { MoreScreen(onAction) }
                 Destination.Activity -> item { ActivityScreen() }
-                Destination.Heartbeat -> item { HeartbeatScreen() }
+                Destination.Heartbeat -> item { HeartbeatScreen(state, onAction) }
                 Destination.Logs -> item { LogsScreen(state, onAction) }
-                Destination.Reports -> item { ReportsScreen() }
+                Destination.Reports -> item { ReportsScreen(state, onAction) }
             }
             item { Spacer(Modifier.height(12.dp)) }
         }
@@ -483,14 +491,46 @@ private fun ActivityScreen() {
 }
 
 @Composable
-private fun HeartbeatScreen() {
+private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    LaunchedEffect(Unit) {
+        onAction(NjordAction.HeartbeatLoading)
+        val result = withContext(Dispatchers.IO) {
+            NjordApiClient.fetchHeartbeat(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )
+        }
+        when (result) {
+            is HeartbeatResult.Success -> {
+                val snapshot = mapApiHeartbeat(result)
+                onAction(
+                    NjordAction.HeartbeatLoaded(
+                        routines = snapshot.routines,
+                        healthyCount = snapshot.healthyCount,
+                        lateCount = snapshot.lateCount,
+                        criticalCount = snapshot.criticalCount,
+                        totalCount = snapshot.totalCount
+                    )
+                )
+            }
+
+            is HeartbeatResult.Error -> onAction(NjordAction.HeartbeatError)
+            else -> {}
+        }
+    }
+
     Column(
         Modifier
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        HeartbeatHealthCard()
+        HeartbeatHealthCard(
+            healthyCount = state.heartbeatHealthyCount,
+            lateCount = state.heartbeatLateCount,
+            criticalCount = state.heartbeatCriticalCount,
+            totalCount = state.heartbeatTotalCount
+        )
         Text(
             "Service routines",
             color = TextPrimary,
@@ -498,13 +538,30 @@ private fun HeartbeatScreen() {
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(top = 18.dp, bottom = 4.dp, start = 4.dp)
         )
-        NjordMockData.heartbeatRoutines.forEach { HeartbeatRow(it) }
+        state.heartbeatRoutines.forEach { HeartbeatRow(it) }
     }
 }
 
 @Composable
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val logs = visibleLogs(NjordMockData.logs, state.logFilter, state.logQuery)
+    val logs = visibleLogs(state.logs, state.logFilter, state.logQuery)
+    var expandedLogKey by remember(logs) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        onAction(NjordAction.LogsLoading)
+        val result = withContext(Dispatchers.IO) {
+            NjordApiClient.fetchLogs(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )
+        }
+        when (result) {
+            is LogsResult.Success -> onAction(NjordAction.LogsLoaded(mapApiEntries(result.entries)))
+            is LogsResult.Error -> onAction(NjordAction.LogsError)
+            else -> {}
+        }
+    }
+
     Column(
         Modifier
             .padding(horizontal = 16.dp)
@@ -534,37 +591,84 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             label = { it.label },
             onSelect = { onAction(NjordAction.SetLogFilter(it)) }
         )
-        if (logs.isEmpty()) {
+        if (state.logsLoading) {
+            NjordCard { Text("Loading logs…", color = TextMuted) }
+        } else if (state.logsError) {
+            NjordCard { Text("Could not load logs.", color = Danger) }
+        } else if (logs.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLogs")) {
                 Text("No logs match this filter.", color = TextMuted)
             }
         } else {
-            logs.forEach { LogRow(it) }
+            logs.forEach { log ->
+                val logKey = "${log.time}|${log.level}|${log.title}|${log.message}"
+                LogRow(
+                    log = log,
+                    expanded = expandedLogKey == logKey,
+                    onClick = {
+                        expandedLogKey = if (expandedLogKey == logKey) null else logKey
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ReportsScreen() {
+private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    LaunchedEffect(Unit) {
+        onAction(NjordAction.HunchReportLoading)
+        val result = withContext(Dispatchers.IO) {
+            NjordApiClient.fetchHunchReport(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )
+        }
+        when (result) {
+            is HunchReportResult.Success -> onAction(NjordAction.HunchReportLoaded(mapApiReport(result.report)))
+            is HunchReportResult.Error -> onAction(NjordAction.HunchReportError)
+            else -> {}
+        }
+    }
+
+    val report = state.hunchReport
+
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ReportReferencePanel()
+        if (state.hunchReportLoading) {
+            NjordCard { Text("Loading Hunch report…", color = TextMuted) }
+        } else if (state.hunchReportError) {
+            NjordCard { Text("Could not load Hunch report. Showing cached sample.", color = Danger) }
+        }
+        ReportReferencePanel(report)
         NjordCard {
             Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            NjordMockData.reportFactors.filterNot { it.isRisk }.forEach { ReportFactorRow(it) }
+            if (report.keyFactors.isEmpty()) {
+                Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.keyFactors.forEach { ReportFactorRow(it) }
+            }
         }
         NjordCard {
             Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            NjordMockData.reportFactors.filter { it.isRisk }.forEach { ReportFactorRow(it) }
+            if (report.risks.isEmpty()) {
+                Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.risks.forEach { ReportFactorRow(it) }
+            }
         }
         NjordCard {
             Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            NjordMockData.layerScores.forEach { LayerScoreRow(it) }
+            if (report.layerScores.isEmpty()) {
+                Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.layerScores.forEach { LayerScoreRow(it) }
+            }
         }
     }
 }
 
 @Composable
-private fun ReportReferencePanel() {
+private fun ReportReferencePanel(report: HunchReport) {
     val panelShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 
     Column(
@@ -590,7 +694,7 @@ private fun ReportReferencePanel() {
                 .padding(horizontal = 15.dp, vertical = 20.dp)
         ) {
             Text(
-                "Hunch BTC Signal — 2026-06-08",
+                report.title,
                 color = TextPrimary,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -605,11 +709,11 @@ private fun ReportReferencePanel() {
             ) {
                 Column {
                     Text("Latest report", color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Persisted 18m ago", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(report.persistedAge, color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
             Spacer(Modifier.height(28.dp))
-            ReportSignalBanner()
+            ReportSignalBanner(report)
             Spacer(Modifier.height(14.dp))
         }
 
@@ -627,31 +731,31 @@ private fun ReportReferencePanel() {
                 letterSpacing = 2.sp
             )
             Spacer(Modifier.height(20.dp))
-            ReportSummaryRow("Last Signal", "SELL", Tone.Danger)
-            ReportSummaryRow("Last Confidence", "HIGH", Tone.Muted)
-            ReportSummaryRow("Last Score", "-0.468", Tone.Muted)
-            ReportSummaryRow("Last Signal Date", "2026-06-07", Tone.Muted)
-            ReportSummaryRow("Last BTC Price", "$62,215.00", Tone.Muted)
-            ReportSummaryRow("Current BTC Price", "$63,193.50", Tone.Muted)
-            ReportSummaryRow("Price Delta", "+1.57%", Tone.Success)
-            ReportSummaryRow("Last Signal Correct", "NO", Tone.Danger, showDivider = false)
+            ReportSummaryRow("Last Signal", report.signal, report.signalTone)
+            ReportSummaryRow("Last Confidence", report.confidence, Tone.Muted)
+            ReportSummaryRow("Last Score", report.score, Tone.Muted)
+            ReportSummaryRow("Last Signal Date", report.date, Tone.Muted)
+            ReportSummaryRow("Last BTC Price", report.btcPriceAtSignal, Tone.Muted)
+            ReportSummaryRow("Current BTC Price", report.currentBtcPrice, Tone.Muted)
+            ReportSummaryRow("Price Delta", report.priceDelta, report.priceDeltaTone)
+            ReportSummaryRow("Last Signal Correct", report.wasSignalCorrect, report.wasSignalCorrectTone, showDivider = false)
         }
     }
 }
 
 @Composable
-private fun ReportSignalBanner() {
+private fun ReportSignalBanner(report: HunchReport) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFFFF315F))
+            .background(toneColor(report.signalTone))
             .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
             .padding(horizontal = 18.dp, vertical = 25.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "SELL",
+            report.signal,
             color = Color.White,
             fontSize = 36.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -659,7 +763,7 @@ private fun ReportSignalBanner() {
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Confidence: HIGH | Score: -0.523",
+            "Confidence: ${report.confidence} | Score: ${report.score}",
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -1587,7 +1691,12 @@ private fun RiskRow(check: RiskCheck) {
 }
 
 @Composable
-private fun HeartbeatHealthCard() {
+private fun HeartbeatHealthCard(
+    healthyCount: Int,
+    lateCount: Int,
+    criticalCount: Int,
+    totalCount: Int
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1610,7 +1719,7 @@ private fun HeartbeatHealthCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "7 / 8",
+                "$healthyCount / $totalCount",
                 color = TextPrimary,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -1618,9 +1727,9 @@ private fun HeartbeatHealthCard() {
                 modifier = Modifier.weight(1f)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HeartbeatStatusPill("7 OK", Tone.Success)
-                HeartbeatStatusPill("1 late", Tone.Warning)
-                HeartbeatStatusPill("0 critical", Tone.Danger)
+                HeartbeatStatusPill("$healthyCount OK", Tone.Success)
+                HeartbeatStatusPill("$lateCount late", Tone.Warning)
+                HeartbeatStatusPill("$criticalCount critical", Tone.Danger)
             }
         }
     }
@@ -1691,14 +1800,20 @@ private fun HeartbeatRoutinePill(label: String, tone: Tone) {
 }
 
 @Composable
-private fun LogRow(log: LogEntry) {
-    NjordCard {
+private fun LogRow(log: LogEntry, expanded: Boolean, onClick: () -> Unit) {
+    NjordCard(Modifier.testTag("logRow"), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Badge(log.level.label, log.level.toTone())
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(log.title, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text(log.message, color = TextMuted, fontSize = 12.sp)
+                Text(
+                    log.message,
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
+                )
             }
             Text(log.time, color = TextMuted2, fontSize = 12.sp)
         }
