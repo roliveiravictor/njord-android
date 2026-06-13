@@ -1,0 +1,68 @@
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_c2c1483d723c6c::t_e42a118f76e024 105,112,115-116
+  s_52207f5fae17d0::t_e109259aee98ad 612-616
+  s_c2c1483d723c6c::t_a97a492192cb5e 312-328,330-333,336-342,347,350
+  s_c2c1483d723c6c::t_543c9e94a85b45 932,942-947,951-957,959,963-965,1173,1189,1192,1220,1226-1235,1241-1258,1275,1277,1279
+  s_43ff3ff4661ad2::t_cbafe474869354 148,150
+  s_52207f5fae17d0::t_05f6cf21449bc6 109-110,274,476-493,501,519,522-526,535-540
+app/src/main/java/com/njord/mobile/api/HeartbeatMapper.kt
+  s_43ff3ff4661ad2::t_477b7a460434a3 25-35,38-39
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_c2c1483d723c6c::t_2201f3167a535a 224-271
+  s_52207f5fae17d0::t_e4a42e937c2fe0 401
+  s_c2c1483d723c6c::t_d3457b6229beb4 65-104
+  s_52207f5fae17d0::t_05f6cf21449bc6 41-52,59-64,105-110,158,162,167-177,272-277,286-288,295-299
+  s_52207f5fae17d0::t_1e761116a61dc5 180,399-400
+  s_c2c1483d723c6c::t_1a56619325677c 137,141,146-157
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_52207f5fae17d0::t_05f6cf21449bc6 75-76,94-96,139-146
+  s_c2c1483d723c6c::t_f2c7d63f27d220 70-72,112-114,168-174,205-217
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_52207f5fae17d0::t_ecace6dfcaf4c6 20-22,24-25
+  s_43ff3ff4661ad2::t_d52d59e57ba099 304-310
+  s_c2c1483d723c6c::t_53258efe6b790a 165-166,168-169,173
+  s_c2c1483d723c6c::t_6841a284b938a4 73-164,167,170-172,174-176
+  s_52207f5fae17d0::t_6122548806d7f0 23
+  s_43ff3ff4661ad2::t_c2903bfa538ea3 340-344
+app/src/main/java/com/njord/mobile/api/ActivityMapper.kt
+  s_52207f5fae17d0::t_05f6cf21449bc6 1-9,13,15,21-25
+app/src/main/java/com/njord/mobile/api/HomeMapper.kt
+  s_c2c1483d723c6c::t_780b30fbe0afdd 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "94100439d5cc6a941158df70bad1f763ebe80aad",
+  "prompts": {},
+  "humans": {
+    "h_261d8b521f67f2": {
+      "author": "Victor <roliveira.victor@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_43ff3ff4661ad2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec22b-f131-77c0-832d-235f7f18dfce",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_52207f5fae17d0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec235-5089-7683-8ab7-4124968a02da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_c2c1483d723c6c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec24e-0cef-7680-88b3-f92f6783132e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
