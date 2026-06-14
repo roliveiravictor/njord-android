@@ -112,17 +112,23 @@ import com.njord.mobile.api.LogsResult
 import com.njord.mobile.api.NjordApiCache
 import com.njord.mobile.api.NjordApiClient
 import com.njord.mobile.api.ActivityResult
+import com.njord.mobile.api.PortfolioResult
 import com.njord.mobile.api.mapApiActivity
 import com.njord.mobile.api.mapApiHeartbeat
 import com.njord.mobile.api.mapApiHome
+import com.njord.mobile.api.mapApiPortfolio
 import com.njord.mobile.api.mapApiReport
 import com.njord.mobile.api.mapApiEntries
 import com.njord.mobile.model.ActivitySummary
+import com.njord.mobile.model.ChartPoint
 import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.HunchReport
 import com.njord.mobile.model.NjordMockData
 import com.njord.mobile.model.NjordUiState
+import com.njord.mobile.model.PortfolioMetric
+import com.njord.mobile.model.PortfolioMonthReturn
 import com.njord.mobile.model.PortfolioPosition
+import com.njord.mobile.model.PortfolioSnapshot
 import com.njord.mobile.model.ReportFactor
 import com.njord.mobile.model.RiskCheck
 import com.njord.mobile.model.SideFilter
@@ -160,20 +166,6 @@ private val LiveStrategyFilterActive = Color(0xFF263846)
 private val LiveCardSurface = Color(0xFF151A21)
 private val LiveTileSurface = Color(0xFF25292F)
 private val LiveErrorSurface = Color(0xFF18161B)
-
-private data class PortfolioStat(
-    val label: String,
-    val value: String,
-    val tone: Tone = Tone.Muted,
-    val subtext: String? = null
-)
-
-private data class MonthReturn(
-    val month: String,
-    val value: String,
-    val progress: Float,
-    val tone: Tone
-)
 
 private data class CoinLogoSources(
     val primaryUrl: String,
@@ -381,8 +373,48 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun PortfolioScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
+    val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
+    val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
+
+    LaunchedEffect(strategy) {
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parsePortfolioResponse(cachedBody)) {
+                    is PortfolioResult.Success -> dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
+                    is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
+                    else -> {}
+                }
+            }
+
+            dispatchUiAction(onAction, NjordAction.PortfolioLoading)
+            when (val result = NjordApiClient.fetchPortfolioPayload(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY,
+                strategy
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parsePortfolioResponse(result.body)) {
+                        is PortfolioResult.Success -> {
+                            NjordApiCache.write(context.filesDir, cacheKey, result.body)
+                            dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(parsed.response)))
+                        }
+                        is PortfolioResult.Error -> dispatchUiAction(onAction, NjordAction.PortfolioError)
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> dispatchUiAction(onAction, NjordAction.PortfolioError)
+            }
+        }
+    }
+
+    val snapshot = state.portfolioSnapshot ?: fallbackPortfolioSnapshot()
+
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        PortfolioPerformanceHero()
+        PortfolioPerformanceHero(snapshot)
+        if (state.portfolioError) {
+            ApiErrorCard("Remote portfolio data unavailable. Showing the last cached or demo snapshot.")
+        }
         FilterRow(
             items = StrategyFilter.entries,
             selected = state.portfolioStrategyFilter,
@@ -390,29 +422,91 @@ private fun PortfolioScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
             onSelect = { onAction(NjordAction.SetPortfolioStrategyFilter(it)) }
         )
         SectionTitle("Live metrics")
-        PortfolioMetricGrid()
+        PortfolioMetricGrid(snapshot.liveMetrics)
         SectionTitle("Monthly stats")
-        PortfolioMonthlyStats()
+        PortfolioMonthlyStats(snapshot.monthlyStats)
         SectionTitle("Performance history")
         PortfolioHistoryCard(
             title = "Portfolio P&L over time",
             trailing = "30D trend",
-            stats = listOf(
-                PortfolioStat("Current", "$18.4k"),
-                PortfolioStat("High", "$19.1k"),
-                PortfolioStat("30D P&L", "+$2.4k", Tone.Success)
-            )
+            stats = snapshot.equityStats
         ) {
             ChartCanvas(
                 positive = true,
                 showFill = true,
-                axisLabels = listOf("May 10", "May 20", "May 30", "Today")
+                axisLabels = snapshot.equityAxisLabels,
+                points = snapshot.equityCurve
             )
         }
-        DrawdownHistoryCard()
-        ReturnByMonthCard()
+        DrawdownHistoryCard(snapshot)
+        ReturnByMonthCard(snapshot)
     }
 }
+
+private fun portfolioApiStrategy(filter: StrategyFilter): String =
+    when (filter) {
+        StrategyFilter.All -> "all"
+        StrategyFilter.BigBang -> "big_bang"
+        StrategyFilter.Wcr -> "wcr"
+        StrategyFilter.Hunch -> "hunch"
+    }
+
+private fun portfolioCacheKey(filter: StrategyFilter): ApiCacheKey =
+    when (filter) {
+        StrategyFilter.All -> ApiCacheKey.PortfolioAll
+        StrategyFilter.BigBang -> ApiCacheKey.PortfolioBigBang
+        StrategyFilter.Wcr -> ApiCacheKey.PortfolioWcr
+        StrategyFilter.Hunch -> ApiCacheKey.PortfolioHunch
+    }
+
+private fun fallbackPortfolioSnapshot(): PortfolioSnapshot =
+    PortfolioSnapshot(
+        totalEquity = "$18.4k",
+        returnBadge = "ALL +127.4%",
+        returnTone = Tone.Info,
+        todayPnl = "+$96",
+        todayPct = "+0.5%",
+        todayTone = Tone.Success,
+        sevenDayPnl = "+$812",
+        sevenDayPct = "+4.6%",
+        sevenDayTone = Tone.Success,
+        thirtyDayPnl = "+$2.4k",
+        thirtyDayPct = "+14.8%",
+        thirtyDayTone = Tone.Success,
+        liveMetrics = listOf(
+            PortfolioMetric("REALIZED P&L", "+$1.9k", Tone.Success, "Closed positions"),
+            PortfolioMetric("UNREALIZED P&L", "+$428", Tone.Success, "Open positions"),
+            PortfolioMetric("WIN RATE", "56%", Tone.Muted, "124 closed trades"),
+            PortfolioMetric("PROFIT FACTOR", "1.42", Tone.Muted, "Gross profit / loss")
+        ),
+        monthlyStats = listOf(
+            PortfolioMetric("BEST MONTH", "+6.2%", Tone.Success, "April"),
+            PortfolioMetric("WORST MONTH", "-1.1%", Tone.Danger, "March"),
+            PortfolioMetric("AVERAGE", "+2.8%", Tone.Success, "Last 6 months")
+        ),
+        equityStats = listOf(
+            PortfolioMetric("Current", "$18.4k"),
+            PortfolioMetric("High", "$19.1k"),
+            PortfolioMetric("30D P&L", "+$2.4k", Tone.Success)
+        ),
+        equityCurve = NjordMockData.equityCurve,
+        equityAxisLabels = listOf("May 10", "May 20", "May 30", "Today"),
+        drawdownStats = listOf(
+            PortfolioMetric("Current", "-2.1%", Tone.Warning),
+            PortfolioMetric("Max", "-6.4%", Tone.Danger),
+            PortfolioMetric("Recovery", "63%")
+        ),
+        drawdownCurve = NjordMockData.drawdownCurve,
+        drawdownAxisLabels = listOf("0%", "-3%", "-6%", "Recovery"),
+        monthlyReturns = listOf(
+            PortfolioMonthReturn("Jan", "+4.1%", 0.66f, Tone.Success),
+            PortfolioMonthReturn("Feb", "+2.3%", 0.48f, Tone.Success),
+            PortfolioMonthReturn("Mar", "-1.1%", 0.24f, Tone.Danger),
+            PortfolioMonthReturn("Apr", "+6.2%", 0.88f, Tone.Success),
+            PortfolioMonthReturn("May", "+3.8%", 0.62f, Tone.Success),
+            PortfolioMonthReturn("Jun", "+1.4%", 0.38f, Tone.Success)
+        )
+    )
 
 @Composable
 private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
@@ -723,17 +817,11 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             ),
             shape = RoundedCornerShape(18.dp)
         )
-        FilterRow(
-            items = LogFilter.entries,
-            selected = state.logFilter,
-            label = { it.label },
-            onSelect = { onAction(NjordAction.SetLogFilter(it)) }
-        )
-        FilterRow(
-            items = StrategyFilter.entries,
-            selected = state.logStrategyFilter,
-            label = { it.label },
-            onSelect = { onAction(NjordAction.SetLogStrategyFilter(it)) }
+        LogsFilterBar(
+            strategyFilter = state.logStrategyFilter,
+            logFilter = state.logFilter,
+            onStrategySelect = { onAction(NjordAction.SetLogStrategyFilter(it)) },
+            onLogFilterSelect = { onAction(NjordAction.SetLogFilter(it)) }
         )
         if (logs.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLogs")) {
@@ -1060,7 +1148,7 @@ private fun HomeHeroKpi(label: String, value: String) {
 }
 
 @Composable
-private fun PortfolioPerformanceHero() {
+private fun PortfolioPerformanceHero(snapshot: PortfolioSnapshot) {
     val shape = RoundedCornerShape(28.dp)
     Column(
         modifier = Modifier
@@ -1075,47 +1163,47 @@ private fun PortfolioPerformanceHero() {
             Column(Modifier.weight(1f)) {
                 Text("PORTFOLIO PERFORMANCE", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(7.dp))
-                Text("$18.4k", color = Success, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
+                Text(snapshot.totalEquity, color = Success, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Info.copy(alpha = 0.22f))
+                    .background(toneColor(snapshot.returnTone).copy(alpha = 0.22f))
                     .padding(horizontal = 11.dp, vertical = 6.dp)
             ) {
-                Text("ALL +127.4%", color = Color(0xFFBFD0FF), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                Text(snapshot.returnBadge, color = Color(0xFFBFD0FF), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
         Spacer(Modifier.height(28.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PortfolioStatTile("TODAY", "+$96", Tone.Success, "+0.5%", Modifier.weight(1f))
-            PortfolioStatTile("7D", "+$812", Tone.Success, "+4.6%", Modifier.weight(1f))
-            PortfolioStatTile("30D", "+$2.4k", Tone.Success, "+14.8%", Modifier.weight(1f))
+            PortfolioStatTile("TODAY", snapshot.todayPnl, snapshot.todayTone, snapshot.todayPct, Modifier.weight(1f))
+            PortfolioStatTile("7D", snapshot.sevenDayPnl, snapshot.sevenDayTone, snapshot.sevenDayPct, Modifier.weight(1f))
+            PortfolioStatTile("30D", snapshot.thirtyDayPnl, snapshot.thirtyDayTone, snapshot.thirtyDayPct, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun PortfolioMetricGrid() {
+private fun PortfolioMetricGrid(metrics: List<PortfolioMetric>) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PortfolioStatTile("REALIZED P&L", "+$1.9k", Tone.Success, "Closed positions", Modifier.weight(1f))
-            PortfolioStatTile("UNREALIZED P&L", "+$428", Tone.Success, "Open positions", Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PortfolioStatTile("WIN RATE", "56%", Tone.Muted, "124 closed trades", Modifier.weight(1f))
-            PortfolioStatTile("PROFIT FACTOR", "1.42", Tone.Muted, "Gross profit / loss", Modifier.weight(1f))
+        metrics.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { metric ->
+                    PortfolioStatTile(metric.label, metric.value, metric.tone, metric.subtext, Modifier.weight(1f))
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-private fun PortfolioMonthlyStats() {
+private fun PortfolioMonthlyStats(stats: List<PortfolioMetric>) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        PortfolioStatTile("BEST MONTH", "+6.2%", Tone.Success, "April", Modifier.weight(1f))
-        PortfolioStatTile("WORST MONTH", "-1.1%", Tone.Danger, "March", Modifier.weight(1f))
-        PortfolioStatTile("AVERAGE", "+2.8%", Tone.Success, "Last 6 months", Modifier.weight(1f))
+        stats.forEach { stat ->
+            PortfolioStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
+        }
     }
 }
 
@@ -1123,7 +1211,7 @@ private fun PortfolioMonthlyStats() {
 private fun PortfolioHistoryCard(
     title: String,
     trailing: String,
-    stats: List<PortfolioStat>,
+    stats: List<PortfolioMetric>,
     content: @Composable () -> Unit
 ) {
     NjordCard {
@@ -1168,46 +1256,30 @@ private fun PortfolioStatTile(
 }
 
 @Composable
-private fun DrawdownHistoryCard() {
+private fun DrawdownHistoryCard(snapshot: PortfolioSnapshot) {
     PortfolioHistoryCard(
         title = "Drawdown",
         trailing = "Risk depth",
-        stats = listOf(
-            PortfolioStat("Current", "-2.1%", Tone.Warning),
-            PortfolioStat("Max", "-6.4%", Tone.Danger),
-            PortfolioStat("Recovery", "63%")
-        )
+        stats = snapshot.drawdownStats
     ) {
         ChartCanvas(
             positive = false,
             showFill = true,
-            axisLabels = listOf("0%", "-3%", "-6%", "Recovery")
+            axisLabels = snapshot.drawdownAxisLabels,
+            points = snapshot.drawdownCurve
         )
     }
 }
 
 @Composable
-private fun ReturnByMonthCard() {
-    val months = listOf(
-        MonthReturn("Jan", "+4.1%", 0.66f, Tone.Success),
-        MonthReturn("Feb", "+2.3%", 0.48f, Tone.Success),
-        MonthReturn("Mar", "-1.1%", 0.24f, Tone.Danger),
-        MonthReturn("Apr", "+6.2%", 0.88f, Tone.Success),
-        MonthReturn("May", "+3.8%", 0.62f, Tone.Success),
-        MonthReturn("Jun", "+1.4%", 0.38f, Tone.Success)
-    )
-
+private fun ReturnByMonthCard(snapshot: PortfolioSnapshot) {
     PortfolioHistoryCard(
         title = "Return by month",
         trailing = "6-month view",
-        stats = listOf(
-            PortfolioStat("Best", "+6.2%", Tone.Success),
-            PortfolioStat("Worst", "-1.1%", Tone.Danger),
-            PortfolioStat("Average", "+2.8%", Tone.Success)
-        )
+        stats = snapshot.monthlyStats
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            months.forEach { month ->
+            snapshot.monthlyReturns.forEach { month ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(month.month, color = TextMuted, fontSize = 13.sp, modifier = Modifier.width(34.dp))
                     Box(
@@ -1536,6 +1608,50 @@ private fun LiveFilterBar(
                     activeTextColor = Color(0xFF052433),
                     modifier = Modifier.testTag("filter-${filter.label}"),
                     onClick = { onSideSelect(filter) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogsFilterBar(
+    strategyFilter: StrategyFilter,
+    logFilter: LogFilter,
+    onStrategySelect: (StrategyFilter) -> Unit,
+    onLogFilterSelect: (LogFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(LiveFilterSurface)
+            .border(1.dp, Outline.copy(alpha = 0.58f), RoundedCornerShape(24.dp))
+            .padding(6.dp)
+            .testTag("logsFilterBar"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            StrategyFilter.entries.forEach { filter ->
+                LiveFilterPill(
+                    label = filter.label,
+                    active = filter == strategyFilter,
+                    activeColor = LiveStrategyFilterActive,
+                    activeTextColor = TextPrimary,
+                    modifier = Modifier.testTag("filter-${filter.label}"),
+                    onClick = { onStrategySelect(filter) }
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(LogFilter.All, LogFilter.Warn, LogFilter.Error).forEach { filter ->
+                LiveFilterPill(
+                    label = filter.label,
+                    active = filter == logFilter,
+                    activeColor = Primary,
+                    activeTextColor = Color(0xFF052433),
+                    modifier = Modifier.testTag("filter-${filter.label}"),
+                    onClick = { onLogFilterSelect(filter) }
                 )
             }
         }
@@ -2175,9 +2291,10 @@ private fun LineChartCard(title: String, subtitle: String, positive: Boolean) {
 private fun ChartCanvas(
     positive: Boolean,
     showFill: Boolean = false,
-    axisLabels: List<String> = emptyList()
+    axisLabels: List<String> = emptyList(),
+    points: List<ChartPoint> = emptyList()
 ) {
-    val points = if (positive) NjordMockData.equityCurve else NjordMockData.drawdownCurve
+    val chartPoints = points.ifEmpty { if (positive) NjordMockData.equityCurve else NjordMockData.drawdownCurve }
     val lineColor = if (positive) Success else Danger
     Column(
         modifier = Modifier
@@ -2198,13 +2315,13 @@ private fun ChartCanvas(
                 drawLine(Color.White.copy(alpha = 0.08f), Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
             }
             val path = Path()
-            points.forEachIndexed { index, point ->
+            chartPoints.forEachIndexed { index, point ->
                 val offset = Offset(point.x * w, point.y * h)
                 if (index == 0) path.moveTo(offset.x, offset.y) else path.lineTo(offset.x, offset.y)
             }
             if (showFill) {
                 val fillPath = Path()
-                points.forEachIndexed { index, point ->
+                chartPoints.forEachIndexed { index, point ->
                     val offset = Offset(point.x * w, point.y * h)
                     if (index == 0) fillPath.moveTo(offset.x, offset.y) else fillPath.lineTo(offset.x, offset.y)
                 }

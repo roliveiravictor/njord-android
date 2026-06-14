@@ -25,6 +25,13 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun portfolioUrl_requestsSelectedStrategy() {
+        val url = NjordApiClient.portfolioUrl("https://noatun.dev", "big_bang")
+
+        assertEquals("https://noatun.dev/v1/portfolio?strategy=big_bang", url)
+    }
+
+    @Test
     fun parseLogsResponse_wellFormedJson_returnsSuccessWithEntries() {
         val json = makeValidJson(
             makeEntry("INFO", "hyperliquid.wcr", "Rebalance complete", "2026-06-12T14:23:01"),
@@ -135,6 +142,70 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun parsePortfolioResponse_wellFormedJson_returnsSuccessWithMetrics() {
+        val json = """
+            {
+              "total_equity":18420.0,
+              "initial_capital":10000.0,
+              "all_time_return_pct":84.2,
+              "performance_strip":{
+                "today_pnl":96.0,
+                "today_pnl_pct":0.5,
+                "seven_day_pnl":812.0,
+                "seven_day_pnl_pct":4.6,
+                "thirty_day_pnl":2400.0,
+                "thirty_day_pnl_pct":14.8
+              },
+              "live_metrics":{
+                "realized_pnl":1900.0,
+                "unrealized_pnl":428.0,
+                "win_rate":56.0,
+                "profit_factor":1.42,
+                "total_closed_trades":124
+              },
+              "equity_curve":[
+                {"timestamp":"2026-05-10","equity":16000.0},
+                {"timestamp":"2026-06-10","equity":18420.0}
+              ],
+              "drawdown_series":[
+                {"timestamp":"2026-05-10","drawdown_pct":0.0},
+                {"timestamp":"2026-06-10","drawdown_pct":-2.1}
+              ],
+              "max_drawdown_pct":-6.4,
+              "current_drawdown_pct":-2.1,
+              "recovery_pct":63.0,
+              "monthly_returns":[
+                {"month":"2026-05","pnl":300.0,"pnl_pct":3.8},
+                {"month":"2026-06","pnl":120.0,"pnl_pct":1.4}
+              ],
+              "monthly_stats":{
+                "best_month":{"month":"2026-05","pnl":300.0,"pnl_pct":3.8},
+                "worst_month":{"month":"2026-06","pnl":120.0,"pnl_pct":1.4},
+                "average_monthly_pnl":2.6
+              }
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parsePortfolioResponse(json)
+
+        assertTrue(result is PortfolioResult.Success)
+        val response = (result as PortfolioResult.Success).response
+        assertEquals(18420.0, response.totalEquity, 0.0001)
+        assertEquals(96.0, response.performanceStrip.todayPnl ?: 0.0, 0.0001)
+        assertEquals(124, response.liveMetrics.totalClosedTrades)
+        assertEquals(2, response.equityCurve.size)
+        assertEquals(-2.1, response.drawdownSeries[1].drawdownPct, 0.0001)
+        assertEquals("2026-05", response.monthlyStats.bestMonth?.month)
+    }
+
+    @Test
+    fun parsePortfolioResponse_missingLiveMetrics_returnsError() {
+        val result = NjordApiClient.parsePortfolioResponse("""{"performance_strip":{}}""")
+
+        assertTrue(result is PortfolioResult.Error)
+    }
+
+    @Test
     fun mapApiHome_formatsSnapshotForHomeCards() {
         val response = HomeApiResponse(
             totalBalance = 18420.0,
@@ -176,6 +247,61 @@ class NjordApiClientTest {
         assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
         assertEquals("+\$184.00", snapshot.strategies[0].pnl)
         assertEquals("+2.6%", snapshot.strategies[0].pct)
+    }
+
+    @Test
+    fun mapApiPortfolio_formatsSnapshotForPortfolioCards() {
+        val response = PortfolioApiResponse(
+            totalEquity = 18420.0,
+            initialCapital = 10000.0,
+            allTimeReturnPct = 84.2,
+            performanceStrip = PortfolioPerformanceStripApiResponse(
+                todayPnl = 96.0,
+                todayPnlPct = 0.5,
+                sevenDayPnl = 812.0,
+                sevenDayPnlPct = 4.6,
+                thirtyDayPnl = 2400.0,
+                thirtyDayPnlPct = 14.8
+            ),
+            liveMetrics = PortfolioLiveMetricsApiResponse(
+                realizedPnl = 1900.0,
+                unrealizedPnl = -428.0,
+                winRate = 56.0,
+                profitFactor = 1.42,
+                totalClosedTrades = 124
+            ),
+            equityCurve = listOf(
+                PortfolioEquityPointApiResponse("2026-05-10", 16000.0),
+                PortfolioEquityPointApiResponse("2026-06-10", 18420.0)
+            ),
+            drawdownSeries = listOf(
+                PortfolioDrawdownPointApiResponse("2026-05-10", 0.0),
+                PortfolioDrawdownPointApiResponse("2026-06-10", -2.1)
+            ),
+            maxDrawdownPct = -6.4,
+            currentDrawdownPct = -2.1,
+            recoveryPct = 63.0,
+            monthlyReturns = listOf(
+                PortfolioMonthlyReturnApiResponse("2026-05", 300.0, 3.8),
+                PortfolioMonthlyReturnApiResponse("2026-06", 120.0, 1.4)
+            ),
+            monthlyStats = PortfolioMonthlyStatsApiResponse(
+                bestMonth = null,
+                worstMonth = null,
+                averageMonthlyPnl = null
+            )
+        )
+
+        val snapshot = mapApiPortfolio(response)
+
+        assertEquals("\$18.4K", snapshot.totalEquity)
+        assertEquals("ALL +84.2%", snapshot.returnBadge)
+        assertEquals("+\$96.00", snapshot.todayPnl)
+        assertEquals("-\$428.00", snapshot.liveMetrics[1].value)
+        assertEquals("56.0%", snapshot.liveMetrics[2].value)
+        assertEquals("May", snapshot.monthlyReturns[0].month)
+        assertEquals(2, snapshot.equityCurve.size)
+        assertEquals("-2.1%", snapshot.drawdownStats[0].value)
     }
 
     @Test

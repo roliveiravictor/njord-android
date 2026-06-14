@@ -3,6 +3,7 @@ package com.njord.mobile
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -233,6 +234,20 @@ class NjordAppTest {
         compose.onNodeWithTag("logSearch").performTextInput("not a real njord log")
 
         compose.onNodeWithTag("emptyLogs").assertIsDisplayed()
+    }
+
+    @Test
+    fun logsFilters_matchLiveSplitLayout() {
+        compose.onNodeWithTag("nav-More").performClick()
+        compose.onNodeWithTag("more-Logs").performClick()
+
+        compose.onNodeWithTag("logsFilterBar").assertIsDisplayed()
+        compose.onNodeWithTag("filter-Big Bang").assertIsDisplayed()
+        compose.onNodeWithTag("filter-WCR").assertIsDisplayed()
+        compose.onNodeWithTag("filter-Hunch").assertIsDisplayed()
+        compose.onNodeWithTag("filter-Warning").assertIsDisplayed()
+        compose.onNodeWithTag("filter-Error").assertIsDisplayed()
+        compose.onAllNodesWithTag("filter-Info").assertCountEquals(0)
     }
 
     @Test

@@ -34,7 +34,7 @@ enum class SideFilter(val label: String) {
 enum class LogFilter(val label: String) {
     All("All"),
     Info("Info"),
-    Warn("Warn"),
+    Warn("Warning"),
     Error("Error")
 }
 
@@ -68,6 +68,9 @@ data class NjordUiState(
     val hunchReport: HunchReport? = null,
     val hunchReportLoading: Boolean = false,
     val hunchReportError: Boolean = false,
+    val portfolioSnapshot: PortfolioSnapshot? = null,
+    val portfolioLoading: Boolean = false,
+    val portfolioError: Boolean = false,
     val homeSnapshot: HomeSnapshot? = null,
     val homeLoading: Boolean = false,
     val homeError: Boolean = false,
@@ -111,6 +114,9 @@ sealed interface NjordAction {
     data object HunchReportLoading : NjordAction
     data class HunchReportLoaded(val report: HunchReport) : NjordAction
     data object HunchReportError : NjordAction
+    data object PortfolioLoading : NjordAction
+    data class PortfolioLoaded(val snapshot: PortfolioSnapshot) : NjordAction
+    data object PortfolioError : NjordAction
     data object HomeLoading : NjordAction
     data class HomeLoaded(val snapshot: HomeSnapshot) : NjordAction
     data object HomeError : NjordAction
@@ -168,6 +174,13 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
             hunchReportError = false
         )
         NjordAction.HunchReportError -> state.copy(hunchReportLoading = false, hunchReportError = true)
+        NjordAction.PortfolioLoading -> state.copy(portfolioLoading = true, portfolioError = false)
+        is NjordAction.PortfolioLoaded -> state.copy(
+            portfolioSnapshot = action.snapshot,
+            portfolioLoading = false,
+            portfolioError = false
+        )
+        NjordAction.PortfolioError -> state.copy(portfolioLoading = false, portfolioError = true)
         NjordAction.HomeLoading -> state.copy(homeLoading = true, homeError = false)
         is NjordAction.HomeLoaded -> state.copy(
             homeSnapshot = action.snapshot,
@@ -234,6 +247,41 @@ data class StrategySummary(
     val assets: String? = null
 )
 data class ActivitySummary(val opened: String, val closed: String, val kept: String)
+data class PortfolioSnapshot(
+    val totalEquity: String,
+    val returnBadge: String,
+    val returnTone: Tone,
+    val todayPnl: String,
+    val todayPct: String,
+    val todayTone: Tone,
+    val sevenDayPnl: String,
+    val sevenDayPct: String,
+    val sevenDayTone: Tone,
+    val thirtyDayPnl: String,
+    val thirtyDayPct: String,
+    val thirtyDayTone: Tone,
+    val liveMetrics: List<PortfolioMetric>,
+    val monthlyStats: List<PortfolioMetric>,
+    val equityStats: List<PortfolioMetric>,
+    val equityCurve: List<ChartPoint>,
+    val equityAxisLabels: List<String>,
+    val drawdownStats: List<PortfolioMetric>,
+    val drawdownCurve: List<ChartPoint>,
+    val drawdownAxisLabels: List<String>,
+    val monthlyReturns: List<PortfolioMonthReturn>
+)
+data class PortfolioMetric(
+    val label: String,
+    val value: String,
+    val tone: Tone = Tone.Muted,
+    val subtext: String? = null
+)
+data class PortfolioMonthReturn(
+    val month: String,
+    val value: String,
+    val progress: Float,
+    val tone: Tone
+)
 data class Incident(
     val id: String,
     val title: String,

@@ -97,10 +97,70 @@ data class HomeApiResponse(
     val heartbeat: HomeApiHeartbeat
 )
 
+data class PortfolioPerformanceStripApiResponse(
+    val todayPnl: Double?,
+    val todayPnlPct: Double?,
+    val sevenDayPnl: Double?,
+    val sevenDayPnlPct: Double?,
+    val thirtyDayPnl: Double?,
+    val thirtyDayPnlPct: Double?
+)
+
+data class PortfolioLiveMetricsApiResponse(
+    val realizedPnl: Double,
+    val unrealizedPnl: Double,
+    val winRate: Double,
+    val profitFactor: Double,
+    val totalClosedTrades: Int
+)
+
+data class PortfolioEquityPointApiResponse(
+    val timestamp: String,
+    val equity: Double
+)
+
+data class PortfolioDrawdownPointApiResponse(
+    val timestamp: String,
+    val drawdownPct: Double
+)
+
+data class PortfolioMonthlyReturnApiResponse(
+    val month: String,
+    val pnl: Double,
+    val pnlPct: Double
+)
+
+data class PortfolioMonthlyStatsApiResponse(
+    val bestMonth: PortfolioMonthlyReturnApiResponse?,
+    val worstMonth: PortfolioMonthlyReturnApiResponse?,
+    val averageMonthlyPnl: Double?
+)
+
+data class PortfolioApiResponse(
+    val totalEquity: Double,
+    val initialCapital: Double,
+    val allTimeReturnPct: Double,
+    val performanceStrip: PortfolioPerformanceStripApiResponse,
+    val liveMetrics: PortfolioLiveMetricsApiResponse,
+    val equityCurve: List<PortfolioEquityPointApiResponse>,
+    val drawdownSeries: List<PortfolioDrawdownPointApiResponse>,
+    val maxDrawdownPct: Double,
+    val currentDrawdownPct: Double,
+    val recoveryPct: Double,
+    val monthlyReturns: List<PortfolioMonthlyReturnApiResponse>,
+    val monthlyStats: PortfolioMonthlyStatsApiResponse
+)
+
 sealed interface HomeResult {
     data object Loading : HomeResult
     data class Success(val response: HomeApiResponse) : HomeResult
     data class Error(val message: String) : HomeResult
+}
+
+sealed interface PortfolioResult {
+    data object Loading : PortfolioResult
+    data class Success(val response: PortfolioApiResponse) : PortfolioResult
+    data class Error(val message: String) : PortfolioResult
 }
 
 sealed interface ActivityResult {
@@ -154,6 +214,13 @@ object NjordApiClient {
         }
     }
 
+    fun fetchPortfolio(baseUrl: String, apiKey: String, strategy: String): PortfolioResult {
+        return when (val payload = fetchPortfolioPayload(baseUrl, apiKey, strategy)) {
+            is ApiPayloadResult.Success -> parsePortfolioResponse(payload.body)
+            is ApiPayloadResult.Error -> PortfolioResult.Error(payload.message)
+        }
+    }
+
     fun fetchLogs(baseUrl: String, apiKey: String): LogsResult {
         return when (val payload = fetchLogsPayload(baseUrl, apiKey)) {
             is ApiPayloadResult.Success -> parseLogsResponse(payload.body)
@@ -179,7 +246,10 @@ object NjordApiClient {
         fetchPayload("$baseUrl/v1/home", apiKey, "fetchHome")
 
     fun fetchActivityPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
-        fetchPayload("$baseUrl/v1/activity", apiKey, "fetchActivity")
+        fetchPayload("$baseUrl/v1/activity?limit=5", apiKey, "fetchActivity")
+
+    fun fetchPortfolioPayload(baseUrl: String, apiKey: String, strategy: String): ApiPayloadResult =
+        fetchPayload(portfolioUrl(baseUrl, strategy), apiKey, "fetchPortfolio")
 
     fun fetchLogsPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload(logsUrl(baseUrl), apiKey, "fetchLogs")
@@ -290,6 +360,90 @@ object NjordApiClient {
         }
     }
 
+    internal fun parsePortfolioResponse(json: String): PortfolioResult {
+        return try {
+            val root = JSONObject(json)
+            val performanceStripObject = root.optJSONObject("performance_strip")
+                ?: return PortfolioResult.Error("Missing 'performance_strip' key")
+            val liveMetricsObject = root.optJSONObject("live_metrics")
+                ?: return PortfolioResult.Error("Missing 'live_metrics' key")
+            val monthlyStatsObject = root.optJSONObject("monthly_stats") ?: JSONObject()
+            PortfolioResult.Success(
+                PortfolioApiResponse(
+                    totalEquity = root.optDouble("total_equity", 0.0),
+                    initialCapital = root.optDouble("initial_capital", 0.0),
+                    allTimeReturnPct = root.optDouble("all_time_return_pct", 0.0),
+                    performanceStrip = PortfolioPerformanceStripApiResponse(
+                        todayPnl = performanceStripObject.optionalDouble("today_pnl"),
+                        todayPnlPct = performanceStripObject.optionalDouble("today_pnl_pct"),
+                        sevenDayPnl = performanceStripObject.optionalDouble("seven_day_pnl"),
+                        sevenDayPnlPct = performanceStripObject.optionalDouble("seven_day_pnl_pct"),
+                        thirtyDayPnl = performanceStripObject.optionalDouble("thirty_day_pnl"),
+                        thirtyDayPnlPct = performanceStripObject.optionalDouble("thirty_day_pnl_pct")
+                    ),
+                    liveMetrics = PortfolioLiveMetricsApiResponse(
+                        realizedPnl = liveMetricsObject.optDouble("realized_pnl", 0.0),
+                        unrealizedPnl = liveMetricsObject.optDouble("unrealized_pnl", 0.0),
+                        winRate = liveMetricsObject.optDouble("win_rate", 0.0),
+                        profitFactor = liveMetricsObject.optDouble("profit_factor", 0.0),
+                        totalClosedTrades = liveMetricsObject.optInt("total_closed_trades", 0)
+                    ),
+                    equityCurve = parseEquityCurve(root),
+                    drawdownSeries = parseDrawdownSeries(root),
+                    maxDrawdownPct = root.optDouble("max_drawdown_pct", 0.0),
+                    currentDrawdownPct = root.optDouble("current_drawdown_pct", 0.0),
+                    recoveryPct = root.optDouble("recovery_pct", 0.0),
+                    monthlyReturns = parseMonthlyReturns(root.optJSONArray("monthly_returns")),
+                    monthlyStats = PortfolioMonthlyStatsApiResponse(
+                        bestMonth = parseMonthlyReturn(monthlyStatsObject.optJSONObject("best_month")),
+                        worstMonth = parseMonthlyReturn(monthlyStatsObject.optJSONObject("worst_month")),
+                        averageMonthlyPnl = monthlyStatsObject.optionalDouble("average_monthly_pnl")
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            PortfolioResult.Error(e.message ?: "Parse error")
+        }
+    }
+
+    private fun parseEquityCurve(root: JSONObject): List<PortfolioEquityPointApiResponse> {
+        val array = root.optJSONArray("equity_curve") ?: return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            val obj = array.optJSONObject(i) ?: return@mapNotNull null
+            PortfolioEquityPointApiResponse(
+                timestamp = obj.optString("timestamp", ""),
+                equity = obj.optDouble("equity", 0.0)
+            )
+        }
+    }
+
+    private fun parseDrawdownSeries(root: JSONObject): List<PortfolioDrawdownPointApiResponse> {
+        val array = root.optJSONArray("drawdown_series") ?: return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            val obj = array.optJSONObject(i) ?: return@mapNotNull null
+            PortfolioDrawdownPointApiResponse(
+                timestamp = obj.optString("timestamp", ""),
+                drawdownPct = obj.optDouble("drawdown_pct", 0.0)
+            )
+        }
+    }
+
+    private fun parseMonthlyReturns(array: org.json.JSONArray?): List<PortfolioMonthlyReturnApiResponse> {
+        if (array == null) return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            parseMonthlyReturn(array.optJSONObject(i))
+        }
+    }
+
+    private fun parseMonthlyReturn(obj: JSONObject?): PortfolioMonthlyReturnApiResponse? {
+        if (obj == null) return null
+        return PortfolioMonthlyReturnApiResponse(
+            month = obj.optString("month", ""),
+            pnl = obj.optDouble("pnl", 0.0),
+            pnlPct = obj.optDouble("pnl_pct", 0.0)
+        )
+    }
+
     private fun parsePositionArray(obj: JSONObject, key: String): List<ActivityApiPosition> {
         val array = obj.optJSONArray(key) ?: return emptyList()
         return (0 until array.length()).mapNotNull { i ->
@@ -390,6 +544,9 @@ object NjordApiClient {
 
     internal fun logsUrl(baseUrl: String): String =
         "$baseUrl/v1/logs?hours=24&limit=5000&exclude_heartbeat=true"
+
+    internal fun portfolioUrl(baseUrl: String, strategy: String): String =
+        "$baseUrl/v1/portfolio?strategy=$strategy"
 }
 
 private fun JSONObject.optionalString(name: String): String? =

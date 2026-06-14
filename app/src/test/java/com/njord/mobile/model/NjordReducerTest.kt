@@ -117,6 +117,56 @@ class NjordReducerTest {
     }
 
     @Test
+    fun portfolioLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(portfolioError = true), NjordAction.PortfolioLoading)
+
+        assertTrue(state.portfolioLoading)
+        assertFalse(state.portfolioError)
+    }
+
+    @Test
+    fun portfolioLoaded_replacesSnapshotAndClearsLoading() {
+        val snapshot = PortfolioSnapshot(
+            totalEquity = "\$18.4k",
+            returnBadge = "ALL +84.2%",
+            returnTone = Tone.Success,
+            todayPnl = "+\$96",
+            todayPct = "+0.5%",
+            todayTone = Tone.Success,
+            sevenDayPnl = "+\$812",
+            sevenDayPct = "+4.6%",
+            sevenDayTone = Tone.Success,
+            thirtyDayPnl = "+\$2.4k",
+            thirtyDayPct = "+14.8%",
+            thirtyDayTone = Tone.Success,
+            liveMetrics = emptyList(),
+            monthlyStats = emptyList(),
+            equityStats = emptyList(),
+            equityCurve = emptyList(),
+            equityAxisLabels = emptyList(),
+            drawdownStats = emptyList(),
+            drawdownCurve = emptyList(),
+            drawdownAxisLabels = emptyList(),
+            monthlyReturns = emptyList()
+        )
+        val state = reduce(NjordUiState(portfolioLoading = true), NjordAction.PortfolioLoaded(snapshot))
+
+        assertEquals(snapshot, state.portfolioSnapshot)
+        assertFalse(state.portfolioLoading)
+        assertFalse(state.portfolioError)
+    }
+
+    @Test
+    fun portfolioError_setsErrorTrueAndKeepsFallbackSnapshot() {
+        val initial = NjordUiState(portfolioLoading = true)
+        val state = reduce(initial, NjordAction.PortfolioError)
+
+        assertEquals(initial.portfolioSnapshot, state.portfolioSnapshot)
+        assertTrue(state.portfolioError)
+        assertFalse(state.portfolioLoading)
+    }
+
+    @Test
     fun heartbeatLoading_setsLoadingTrueAndErrorFalse() {
         val state = reduce(NjordUiState(heartbeatError = true), NjordAction.HeartbeatLoading)
 
