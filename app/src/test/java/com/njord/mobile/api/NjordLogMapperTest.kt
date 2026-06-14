@@ -50,6 +50,20 @@ class NjordLogMapperTest {
     }
 
     @Test
+    fun mapApiEntries_timestampWithUtcSuffix_formattedAsHHmm() {
+        val result = mapApiEntries(listOf(makeEntry("INFO", timestamp = "2026-06-12T14:23:01Z")))
+
+        assertEquals("14:23", result[0].time)
+    }
+
+    @Test
+    fun mapApiEntries_timestampWithOffset_formattedAsHHmm() {
+        val result = mapApiEntries(listOf(makeEntry("INFO", timestamp = "2026-06-12T14:23:01+00:00")))
+
+        assertEquals("14:23", result[0].time)
+    }
+
+    @Test
     fun mapApiEntries_searchText_combinesTitleAndMessage() {
         val result = mapApiEntries(listOf(makeEntry("INFO", title = "hyperliquid.wcr", message = "Rebalance complete")))
 

@@ -775,6 +775,7 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 }
             }
 
+            dispatchUiAction(onAction, NjordAction.LogsLoading)
             when (val result = NjordApiClient.fetchLogsPayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
@@ -785,11 +786,11 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                             NjordApiCache.write(context.filesDir, ApiCacheKey.Logs, result.body)
                             dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(parsed.entries)))
                         }
-                        is LogsResult.Error -> {}
+                        is LogsResult.Error -> dispatchUiAction(onAction, NjordAction.LogsError)
                         else -> {}
                     }
                 }
-                is ApiPayloadResult.Error -> {}
+                is ApiPayloadResult.Error -> dispatchUiAction(onAction, NjordAction.LogsError)
             }
         }
     }
@@ -856,6 +857,7 @@ private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) 
                 }
             }
 
+            dispatchUiAction(onAction, NjordAction.HunchReportLoading)
             when (val result = NjordApiClient.fetchHunchReportPayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
@@ -866,11 +868,11 @@ private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) 
                             NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReport, result.body)
                             dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(parsed.report)))
                         }
-                        is HunchReportResult.Error -> {}
+                        is HunchReportResult.Error -> dispatchUiAction(onAction, NjordAction.HunchReportError)
                         else -> {}
                     }
                 }
-                is ApiPayloadResult.Error -> {}
+                is ApiPayloadResult.Error -> dispatchUiAction(onAction, NjordAction.HunchReportError)
             }
         }
     }

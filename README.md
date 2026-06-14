@@ -1,15 +1,52 @@
 # Njord Android
 
-Native Android implementation of the Njord mobile dashboard mock.
+Native Android implementation of the Njord mobile dashboard.
 
-This first version intentionally uses static in-app sample data copied from the
-HTML mock at:
+## Architecture
 
-`/Users/vrocha/Downloads/njord_mobile_compose_activity_icon_list_alt.html`
+### Offline-first data layer
 
-API integration is deliberately out of scope for this step. The UI reads from
-`NjordMockData`, which can later be replaced by a repository/API-backed data
-source without changing the screen structure.
+Every screen that fetches remote data follows a strict offline-first pattern:
+
+1. **Cache read first** — on composition, the screen immediately reads the last
+   persisted JSON payload from `NjordApiCache` and renders it. The user sees
+   real (possibly stale) data instantly, with no blank loading state.
+2. **Live fetch overlays** — a background IO coroutine then fetches the live
+   API response. On success the UI re-renders with fresh data and the new
+   payload is written back to cache. On failure the cached data stays on screen.
+3. **Cache write-through** — only a successful, parseable API response is
+   written to cache. A parse error deletes the stale cache entry to prevent
+   the app from repeatedly loading bad data.
+
+The cache is file-based (`NjordApiCache`, stored in `filesDir/api-cache/`). Each
+endpoint has a dedicated `ApiCacheKey` enum entry and a corresponding JSON file.
+
+### Fetch pattern (canonical example from `PortfolioScreen`)
+
+```kotlin
+LaunchedEffect(strategy) {
+    withContext(Dispatchers.IO) {
+        // 1. Serve cache immediately
+        NjordApiCache.read(filesDir, cacheKey)?.let { body ->
+            NjordApiClient.parsePortfolioResponse(body).let { result ->
+                if (result is PortfolioResult.Success)
+                    dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(result.response)))
+                else
+                    NjordApiCache.delete(filesDir, cacheKey)
+            }
+        }
+        // 2. Fetch live
+        dispatchUiAction(onAction, NjordAction.PortfolioLoading)
+        when (val result = NjordApiClient.fetchPortfolioPayload(...)) {
+            is ApiPayloadResult.Success -> { /* parse → write cache → PortfolioLoaded */ }
+            is ApiPayloadResult.Error  -> dispatchUiAction(onAction, NjordAction.PortfolioError)
+        }
+    }
+}
+```
+
+All screens must follow this pattern. Skipping the loading or error dispatch
+leaves the UI in an indeterminate state and is a bug.
 
 ## Stack
 
