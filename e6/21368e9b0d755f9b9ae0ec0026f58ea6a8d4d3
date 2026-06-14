@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "e621368e9b0d755f9b9ae0ec0026f58ea6a8d4d3",
+  "prompts": {},
+  "humans": {
+    "h_261d8b521f67f2": {
+      "author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
