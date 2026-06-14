@@ -1,0 +1,95 @@
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_49b90b4ff128c5::t_fd8acbfe38400c 340,342-346,420-464
+  s_e2482b397bbbaa::t_49925ea01d4d53 136-140,144-146,151-153,158-160,165-167,172-195,197-200,203-204,206-207
+  s_0ccef06aab58c3::t_8efbe12eb9d334 234,237,392
+app/src/main/java/com/njord/mobile/api/NjordApiCache.kt
+  s_e2482b397bbbaa::t_49925ea01d4d53 1-39
+context/njord-android-native-port.md
+  s_e2482b397bbbaa::t_a4b7fd5955e11e 47-51,55-58,71-73
+app/build.gradle.kts
+  s_a11dcf1c37127f::t_2cb76b0c501705 14-24,38-47
+app/src/androidTest/java/com/njord/mobile/NjordAppTest.kt
+  s_e2482b397bbbaa::t_c16c485ef0938c 102-124
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_577f1da527c68d::t_eb7a8af9dedafa 182-275
+  s_0ccef06aab58c3::t_5b078770fdf164 24
+  s_49b90b4ff128c5::t_8b8cac78a61009 395-483
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_e2482b397bbbaa::t_4f2db22e4a9446 323-324,326-328,330-335,338-342,344-350,357,361,369,372
+  s_e2482b397bbbaa::t_676ef96739a2bc 329,343,507,523,592-593,617-618,678,692,765,779
+  s_e2482b397bbbaa::t_7b43e63b1fe07b 499-500,502-506,508-514,517-522,524-529,540-564,566-567,569-573
+  s_e2482b397bbbaa::t_782748d4b7ce71 315-320
+  s_e2482b397bbbaa::t_c569a75e67e26f 666-667,670,675-677,679-684,687-691,693-699,732-738
+  s_e2482b397bbbaa::t_fa9fbab154792c 584-585,587-591,594-608,611-616,619-632,643-659
+  s_e2482b397bbbaa::t_a19e2e5f483107 1014,1303,1309,1322
+  s_e2482b397bbbaa::t_c468a260ea2ffd 106-107,112
+  s_e2482b397bbbaa::t_67bf63255cc2a9 759-760,762-764,766-771,774-778,780-786,793-802,804-810,812-818
+app/src/main/java/com/njord/mobile/api/ActivityMapper.kt
+  s_577f1da527c68d::t_9f8574cd540505 9-11,13-26,42-46
+  s_577f1da527c68d::t_6a45e0bc009fad 32-37
+AGENTS.md
+  s_6295c3ce552b5b::t_9a89cace016ccd 1-8
+app/src/test/java/com/njord/mobile/api/NjordApiCacheTest.kt
+  s_e2482b397bbbaa::t_03931d6a71a22f 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "3dcfe7197fc4efbf0570bfcd6176e5c5ff7e87cd",
+  "prompts": {},
+  "humans": {
+    "h_261d8b521f67f2": {
+      "author": "Victor <roliveira.victor@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0ccef06aab58c3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6cc-a28b-7f72-8d9c-d5508237202c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_49b90b4ff128c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6bd-7d5b-7652-b49f-6821fa30d074",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_577f1da527c68d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6c9-c4bd-7602-8e07-eb5cb418e560",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_6295c3ce552b5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6be-fc18-7df2-9aac-746daa4c0bb1",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_a11dcf1c37127f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6f0-ffbd-7880-8fb5-f60aaf7aa76e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_e2482b397bbbaa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec6bc-6388-7983-984e-ea3942f26846",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
