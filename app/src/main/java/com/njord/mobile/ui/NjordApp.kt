@@ -86,6 +86,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -101,10 +103,13 @@ import com.njord.mobile.model.LogEntry
 import com.njord.mobile.model.LogFilter
 import com.njord.mobile.model.MiniKpi
 import com.njord.mobile.model.NjordAction
+import com.njord.mobile.api.ApiCacheKey
+import com.njord.mobile.api.ApiPayloadResult
 import com.njord.mobile.api.HeartbeatResult
 import com.njord.mobile.api.HomeResult
 import com.njord.mobile.api.HunchReportResult
 import com.njord.mobile.api.LogsResult
+import com.njord.mobile.api.NjordApiCache
 import com.njord.mobile.api.NjordApiClient
 import com.njord.mobile.api.ActivityResult
 import com.njord.mobile.api.mapApiActivity
@@ -307,36 +312,53 @@ private fun ScreenHeader(destination: Destination) {
     }
 }
 
+private suspend fun dispatchUiAction(onAction: (NjordAction) -> Unit, action: NjordAction) {
+    withContext(Dispatchers.Main) {
+        onAction(action)
+    }
+}
+
 @Composable
 private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
+
     LaunchedEffect(Unit) {
-        onAction(NjordAction.HomeLoading)
-        val result = withContext(Dispatchers.IO) {
-            NjordApiClient.fetchHome(
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseHomeResponse(cachedBody)) {
+                    is HomeResult.Success -> dispatchUiAction(onAction, NjordAction.HomeLoaded(mapApiHome(cached.response)))
+                    is HomeResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Home)
+                    else -> {}
+                }
+            }
+
+            when (val result = NjordApiClient.fetchHomePayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
-            )
-        }
-        when (result) {
-            is HomeResult.Success -> onAction(NjordAction.HomeLoaded(mapApiHome(result.response)))
-            is HomeResult.Error -> onAction(NjordAction.HomeError)
-            else -> {}
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseHomeResponse(result.body)) {
+                        is HomeResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.Home, result.body)
+                            dispatchUiAction(onAction, NjordAction.HomeLoaded(mapApiHome(parsed.response)))
+                        }
+                        is HomeResult.Error -> {}
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> {}
+            }
         }
     }
 
     val snapshot = state.homeSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HomeEquityHero(snapshot, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Portfolio)) }
-        if (state.homeError) {
-            ApiErrorCard("Could not load home data.")
-        }
+        HomeEquityHero(snapshot) { onAction(NjordAction.Navigate(Destination.Portfolio)) }
 
         SectionTitle("Strategies")
         val strategies = snapshot?.strategies.orEmpty()
-        if (state.homeLoading && strategies.isEmpty()) {
-            NjordCard { Text("Loading strategies…", color = TextMuted, fontSize = 13.sp) }
-        } else if (!state.homeError && strategies.isEmpty()) {
+        if (strategies.isEmpty()) {
             NjordCard { Text("No strategy data available yet.", color = TextMuted, fontSize = 13.sp) }
         }
         strategies.forEach {
@@ -344,10 +366,10 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         }
 
         SectionTitle("Activity")
-        HomeActivityCard(snapshot?.activitySummary, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Activity)) }
+        HomeActivityCard(snapshot?.activitySummary) { onAction(NjordAction.Navigate(Destination.Activity)) }
 
         SectionTitle("Heartbeat")
-        HomeHeartbeatCard(snapshot, state.homeLoading) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
+        HomeHeartbeatCard(snapshot) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
 
         SectionTitle("Incidents")
         HomeIncidentsCard(
@@ -474,21 +496,38 @@ private fun MoreScreen(onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
+
     LaunchedEffect(Unit) {
-        onAction(NjordAction.ActivityLoading)
-        val result = withContext(Dispatchers.IO) {
-            NjordApiClient.fetchActivity(
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseActivityResponse(cachedBody)) {
+                    is ActivityResult.Success -> {
+                        val (summary, cycles) = mapApiActivity(cached.response)
+                        dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
+                    }
+                    is ActivityResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Activity)
+                    else -> {}
+                }
+            }
+
+            when (val result = NjordApiClient.fetchActivityPayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
-            )
-        }
-        when (result) {
-            is ActivityResult.Success -> {
-                val (summary, cycles) = mapApiActivity(result.response)
-                onAction(NjordAction.ActivityLoaded(summary, cycles))
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseActivityResponse(result.body)) {
+                        is ActivityResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.Activity, result.body)
+                            val (summary, cycles) = mapApiActivity(parsed.response)
+                            dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
+                        }
+                        is ActivityResult.Error -> {}
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> {}
             }
-            is ActivityResult.Error -> onAction(NjordAction.ActivityError)
-            else -> {}
         }
     }
 
@@ -498,44 +537,40 @@ private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit)
             .padding(top = 6.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (state.activityError) {
-            ApiErrorCard("Could not load activity data.")
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Surface1)
-                    .border(BorderStroke(1.dp, Outline.copy(alpha = 0.76f)), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 18.dp, vertical = 18.dp)
-                    .testTag("activityReferencePanel")
-            ) {
-                Text(
-                    "Candle close",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Surface1)
+                .border(BorderStroke(1.dp, Outline.copy(alpha = 0.76f)), RoundedCornerShape(24.dp))
+                .padding(horizontal = 18.dp, vertical = 18.dp)
+                .testTag("activityReferencePanel")
+        ) {
+            Text(
+                "Candle close",
+                color = TextPrimary,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(Modifier.height(18.dp))
+            val summary = state.activitySummary
+            if (summary == null) {
+                Text("No cycle data available yet.", color = TextMuted, fontSize = 13.sp)
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ActivitySummaryChip("+${summary.opened}", "Opened")
+                    ActivitySummaryChip("-${summary.closed}", "Closed")
+                    ActivitySummaryChip("•${summary.kept}", "Kept")
+                }
                 Spacer(Modifier.height(18.dp))
-                val summary = state.activitySummary
-                if (state.activityLoading || summary == null) {
-                    Text("Loading activity…", color = TextMuted, fontSize = 13.sp)
-                } else {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ActivitySummaryChip("+${summary.opened}", "Opened")
-                        ActivitySummaryChip("-${summary.closed}", "Closed")
-                        ActivitySummaryChip("•${summary.kept}", "Kept")
-                    }
+                HorizontalDivider(color = Outline.copy(alpha = 0.85f))
+                if (state.activityCycles.isEmpty()) {
                     Spacer(Modifier.height(18.dp))
-                    HorizontalDivider(color = Outline.copy(alpha = 0.85f))
-                    if (state.activityCycles.isEmpty()) {
-                        Spacer(Modifier.height(18.dp))
-                        Text("No cycle data available yet.", color = TextMuted, fontSize = 13.sp)
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                            state.activityCycles.forEachIndexed { index, cycle ->
-                                ActivityCycleTable(cycle, isLast = index == state.activityCycles.lastIndex)
-                            }
+                    Text("No cycle data available yet.", color = TextMuted, fontSize = 13.sp)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        state.activityCycles.forEachIndexed { index, cycle ->
+                            ActivityCycleTable(cycle, isLast = index == state.activityCycles.lastIndex)
                         }
                     }
                 }
@@ -546,30 +581,56 @@ private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit)
 
 @Composable
 private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
+
     LaunchedEffect(Unit) {
-        onAction(NjordAction.HeartbeatLoading)
-        val result = withContext(Dispatchers.IO) {
-            NjordApiClient.fetchHeartbeat(
-                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                com.njord.mobile.BuildConfig.NJORD_API_KEY
-            )
-        }
-        when (result) {
-            is HeartbeatResult.Success -> {
-                val snapshot = mapApiHeartbeat(result)
-                onAction(
-                    NjordAction.HeartbeatLoaded(
-                        routines = snapshot.routines,
-                        healthyCount = snapshot.healthyCount,
-                        lateCount = snapshot.lateCount,
-                        criticalCount = snapshot.criticalCount,
-                        totalCount = snapshot.totalCount
-                    )
-                )
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseHeartbeatResponse(cachedBody)) {
+                    is HeartbeatResult.Success -> {
+                        val snapshot = mapApiHeartbeat(cached)
+                        dispatchUiAction(
+                            onAction,
+                            NjordAction.HeartbeatLoaded(
+                                routines = snapshot.routines,
+                                healthyCount = snapshot.healthyCount,
+                                lateCount = snapshot.lateCount,
+                                criticalCount = snapshot.criticalCount,
+                                totalCount = snapshot.totalCount
+                            )
+                        )
+                    }
+                    is HeartbeatResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Heartbeat)
+                    else -> {}
+                }
             }
 
-            is HeartbeatResult.Error -> onAction(NjordAction.HeartbeatError)
-            else -> {}
+            when (val result = NjordApiClient.fetchHeartbeatPayload(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseHeartbeatResponse(result.body)) {
+                        is HeartbeatResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.Heartbeat, result.body)
+                            val snapshot = mapApiHeartbeat(parsed)
+                            dispatchUiAction(
+                                onAction,
+                                NjordAction.HeartbeatLoaded(
+                                    routines = snapshot.routines,
+                                    healthyCount = snapshot.healthyCount,
+                                    lateCount = snapshot.lateCount,
+                                    criticalCount = snapshot.criticalCount,
+                                    totalCount = snapshot.totalCount
+                                )
+                            )
+                        }
+                        is HeartbeatResult.Error -> {}
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> {}
+            }
         }
     }
 
@@ -579,54 +640,63 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
             .padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        when {
-            state.heartbeatLoading -> {
-                NjordCard { Text("Loading heartbeat…", color = TextMuted, fontSize = 13.sp) }
-            }
-            state.heartbeatError -> {
-                ApiErrorCard("Could not load heartbeat data.")
-            }
-            else -> {
-                HeartbeatHealthCard(
-                    healthyCount = state.heartbeatHealthyCount,
-                    lateCount = state.heartbeatLateCount,
-                    criticalCount = state.heartbeatCriticalCount,
-                    totalCount = state.heartbeatTotalCount
-                )
-                Text(
-                    "Service routines",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(top = 18.dp, bottom = 4.dp, start = 4.dp)
-                )
-                state.heartbeatRoutines.forEach { HeartbeatRow(it) }
-            }
+        HeartbeatHealthCard(
+            healthyCount = state.heartbeatHealthyCount,
+            lateCount = state.heartbeatLateCount,
+            criticalCount = state.heartbeatCriticalCount,
+            totalCount = state.heartbeatTotalCount
+        )
+        Text(
+            "Service routines",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.padding(top = 18.dp, bottom = 4.dp, start = 4.dp)
+        )
+        if (state.heartbeatRoutines.isEmpty()) {
+            NjordCard { Text("No service routines available yet.", color = TextMuted, fontSize = 13.sp) }
+        } else {
+            state.heartbeatRoutines.forEach { HeartbeatRow(it) }
         }
     }
 }
 
 @Composable
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val logs = visibleLogs(state.logs, state.logFilter, state.logQuery)
+    val context = LocalContext.current.applicationContext
+    val logs = visibleLogs(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter)
     var expandedLogKey by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(state.logs, state.logFilter, state.logQuery) {
+    LaunchedEffect(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter) {
         expandedLogKey = null
     }
 
     LaunchedEffect(Unit) {
-        onAction(NjordAction.LogsLoading)
-        val result = withContext(Dispatchers.IO) {
-            NjordApiClient.fetchLogs(
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseLogsResponse(cachedBody)) {
+                    is LogsResult.Success -> dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
+                    is LogsResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
+                    else -> {}
+                }
+            }
+
+            when (val result = NjordApiClient.fetchLogsPayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
-            )
-        }
-        when (result) {
-            is LogsResult.Success -> onAction(NjordAction.LogsLoaded(mapApiEntries(result.entries)))
-            is LogsResult.Error -> onAction(NjordAction.LogsError)
-            else -> {}
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseLogsResponse(result.body)) {
+                        is LogsResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.Logs, result.body)
+                            dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(parsed.entries)))
+                        }
+                        is LogsResult.Error -> {}
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> {}
+            }
         }
     }
 
@@ -659,11 +729,13 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             label = { it.label },
             onSelect = { onAction(NjordAction.SetLogFilter(it)) }
         )
-        if (state.logsLoading) {
-            NjordCard { Text("Loading logs…", color = TextMuted) }
-        } else if (state.logsError) {
-            NjordCard { Text("Could not load logs.", color = Danger) }
-        } else if (logs.isEmpty()) {
+        FilterRow(
+            items = StrategyFilter.entries,
+            selected = state.logStrategyFilter,
+            label = { it.label },
+            onSelect = { onAction(NjordAction.SetLogStrategyFilter(it)) }
+        )
+        if (logs.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLogs")) {
                 Text("No logs match this filter.", color = TextMuted)
             }
@@ -684,56 +756,66 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
+
     LaunchedEffect(Unit) {
-        onAction(NjordAction.HunchReportLoading)
-        val result = withContext(Dispatchers.IO) {
-            NjordApiClient.fetchHunchReport(
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
+                    is HunchReportResult.Success -> dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
+                    is HunchReportResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
+                    else -> {}
+                }
+            }
+
+            when (val result = NjordApiClient.fetchHunchReportPayload(
                 com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
                 com.njord.mobile.BuildConfig.NJORD_API_KEY
-            )
-        }
-        when (result) {
-            is HunchReportResult.Success -> onAction(NjordAction.HunchReportLoaded(mapApiReport(result.report)))
-            is HunchReportResult.Error -> onAction(NjordAction.HunchReportError)
-            else -> {}
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseHunchReportResponse(result.body)) {
+                        is HunchReportResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReport, result.body)
+                            dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(parsed.report)))
+                        }
+                        is HunchReportResult.Error -> {}
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> {}
+            }
         }
     }
 
     val report = state.hunchReport
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        when {
-            state.hunchReportLoading -> {
-                NjordCard { Text("Loading Hunch report…", color = TextMuted) }
-            }
-            state.hunchReportError || report == null -> {
-                ApiErrorCard("Could not load Hunch report.")
-            }
-            else -> {
-                ReportReferencePanel(report)
-                NjordCard {
-                    Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                    if (report.keyFactors.isEmpty()) {
-                        Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                    } else {
-                        report.keyFactors.forEach { ReportFactorRow(it) }
-                    }
+        if (report == null) {
+            NjordCard { Text("No Hunch report available yet.", color = TextMuted) }
+        } else {
+            ReportReferencePanel(report)
+            NjordCard {
+                Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                if (report.keyFactors.isEmpty()) {
+                    Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                } else {
+                    report.keyFactors.forEach { ReportFactorRow(it) }
                 }
-                NjordCard {
-                    Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                    if (report.risks.isEmpty()) {
-                        Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                    } else {
-                        report.risks.forEach { ReportFactorRow(it) }
-                    }
+            }
+            NjordCard {
+                Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                if (report.risks.isEmpty()) {
+                    Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                } else {
+                    report.risks.forEach { ReportFactorRow(it) }
                 }
-                NjordCard {
-                    Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                    if (report.layerScores.isEmpty()) {
-                        Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                    } else {
-                        report.layerScores.forEach { LayerScoreRow(it) }
-                    }
+            }
+            NjordCard {
+                Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+                if (report.layerScores.isEmpty()) {
+                    Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                } else {
+                    report.layerScores.forEach { LayerScoreRow(it) }
                 }
             }
         }
@@ -929,7 +1011,7 @@ private fun HeroCard(label: String, title: String, subtitle: String, footer: Lis
 }
 
 @Composable
-private fun HomeEquityHero(snapshot: HomeSnapshot?, loading: Boolean, onClick: () -> Unit) {
+private fun HomeEquityHero(snapshot: HomeSnapshot?, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -940,12 +1022,12 @@ private fun HomeEquityHero(snapshot: HomeSnapshot?, loading: Boolean, onClick: (
             .testTag("homeEquityHero")
     ) {
         Text(
-            snapshot?.totalEquity ?: if (loading) "Loading…" else "Unavailable",
+            snapshot?.totalBalance ?: "Unavailable",
             color = TextPrimary,
             fontSize = 38.sp,
             fontWeight = FontWeight.ExtraBold
         )
-        Text("Total Equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Total Balance", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             val pnl = snapshot?.unrealizedPnl ?: "--"
@@ -962,6 +1044,7 @@ private fun HomeEquityHero(snapshot: HomeSnapshot?, loading: Boolean, onClick: (
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             HomeHeroKpi("AVAILABLE", snapshot?.availableMargin ?: "--")
             HomeHeroKpi("IN USE", snapshot?.inUse ?: "--")
+            HomeHeroKpi("MARGIN", snapshot?.marginInUse ?: "--")
             HomeHeroKpi("OPEN", snapshot?.openPositionCount ?: "--")
         }
     }
@@ -1217,15 +1300,13 @@ private fun StrategyCard(summary: StrategySummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeActivityCard(summary: ActivitySummary?, loading: Boolean, onClick: () -> Unit) {
+private fun HomeActivityCard(summary: ActivitySummary?, onClick: () -> Unit) {
     NjordCard(Modifier.testTag("homeActivityCard"), onClick = onClick) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Candle close", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
         }
         Spacer(Modifier.height(12.dp))
-        if (loading && summary == null) {
-            Text("Loading latest cycle…", color = TextMuted, fontSize = 13.sp)
-        } else if (summary == null) {
+        if (summary == null) {
             Text("No candle-close cycle available yet.", color = TextMuted, fontSize = 13.sp)
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1238,19 +1319,17 @@ private fun HomeActivityCard(summary: ActivitySummary?, loading: Boolean, onClic
 }
 
 @Composable
-private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, loading: Boolean, onClick: () -> Unit) {
+private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, onClick: () -> Unit) {
     val healthy = snapshot?.heartbeatHealthy ?: 0
     val total = snapshot?.heartbeatTotal ?: 0
     val lateCount = snapshot?.heartbeatLateCount ?: 0
     val subtitle = when {
-        loading && snapshot == null -> "Loading service health…"
         total == 0 -> "No service health available"
         lateCount == 0 -> "All monitored routines healthy"
         lateCount == 1 -> "1 routine late"
         else -> "$lateCount routines late"
     }
     val badge = when {
-        loading && snapshot == null -> "Loading"
         lateCount == 0 -> "OK"
         lateCount == 1 -> "1 late"
         else -> "$lateCount late"
@@ -2391,6 +2470,7 @@ private fun <T> FilterRow(items: List<T>, selected: T, label: (T) -> String, onS
                     .clickable { onSelect(item) }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
                     .testTag("filter-${label(item)}")
+                    .semantics { this.selected = active }
             ) {
                 Text(label(item), color = if (active) Primary else TextMuted, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }

@@ -32,7 +32,8 @@ class NjordReducerTest {
         val filtered = visibleLogs(
             logs = NjordMockData.logs,
             filter = LogFilter.Error,
-            query = "margin"
+            query = "margin",
+            strategyFilter = StrategyFilter.All
         )
 
         assertEquals(2, filtered.size)
@@ -71,7 +72,7 @@ class NjordReducerTest {
 
     @Test
     fun logsLoaded_replacesLogsListAndClearsLoading() {
-        val entry = LogEntry(level = LogFilter.Info, title = "hyperliquid.wcr", message = "ok", time = "14:23", searchText = "hyperliquid.wcr ok")
+        val entry = LogEntry(level = LogFilter.Info, strategy = StrategyFilter.All, title = "hyperliquid.wcr", message = "ok", time = "14:23", searchText = "hyperliquid.wcr ok")
         val state = reduce(NjordUiState(logsLoading = true), NjordAction.LogsLoaded(listOf(entry)))
 
         assertEquals(listOf(entry), state.logs)

@@ -11,6 +11,17 @@ private val localProps = Properties().also { props ->
     if (f.exists()) f.inputStream().use { props.load(it) }
 }
 
+private fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+private val debugApiBaseUrl = providers
+    .gradleProperty("njord.debug.api.base.url")
+    .orElse("http://10.0.2.2:8080")
+
+private val releaseApiBaseUrl = providers
+    .gradleProperty("njord.release.api.base.url")
+    .orElse("https://noatun.dev")
+
 android {
     namespace = "com.njord.mobile"
     compileSdk = 36
@@ -24,8 +35,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "NJORD_API_BASE_URL", "\"${localProps["njord.api.base.url"] ?: ""}\"")
-        buildConfigField("String", "NJORD_API_KEY", "\"${localProps["njord.api.key"] ?: ""}\"")
+        buildConfigField("String", "NJORD_API_KEY", (localProps["njord.api.key"]?.toString() ?: "").asBuildConfigString())
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField("String", "NJORD_API_BASE_URL", debugApiBaseUrl.get().asBuildConfigString())
+        }
+        release {
+            buildConfigField("String", "NJORD_API_BASE_URL", releaseApiBaseUrl.get().asBuildConfigString())
+        }
     }
 
     compileOptions {

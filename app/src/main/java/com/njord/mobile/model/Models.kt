@@ -54,6 +54,7 @@ data class NjordUiState(
     val portfolioStrategyFilter: StrategyFilter = StrategyFilter.All,
     val logFilter: LogFilter = LogFilter.All,
     val logQuery: String = "",
+    val logStrategyFilter: StrategyFilter = StrategyFilter.All,
     val logs: List<LogEntry> = emptyList(),
     val logsLoading: Boolean = false,
     val logsError: Boolean = false,
@@ -86,6 +87,7 @@ sealed interface NjordAction {
     data class SetPortfolioStrategyFilter(val filter: StrategyFilter) : NjordAction
     data class SetLogFilter(val filter: LogFilter) : NjordAction
     data class SetLogQuery(val query: String) : NjordAction
+    data class SetLogStrategyFilter(val filter: StrategyFilter) : NjordAction
     data class SelectIncident(val incident: Incident) : NjordAction
     data object CloseIncident : NjordAction
     data class DismissIncident(val incidentId: String) : NjordAction
@@ -127,6 +129,7 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         is NjordAction.SetPortfolioStrategyFilter -> state.copy(portfolioStrategyFilter = action.filter)
         is NjordAction.SetLogFilter -> state.copy(logFilter = action.filter)
         is NjordAction.SetLogQuery -> state.copy(logQuery = action.query)
+        is NjordAction.SetLogStrategyFilter -> state.copy(logStrategyFilter = action.filter)
         is NjordAction.SelectIncident -> state.copy(selectedIncident = action.incident)
         NjordAction.CloseIncident -> state.copy(selectedIncident = null)
         is NjordAction.DismissIncident -> state.copy(
@@ -189,25 +192,32 @@ fun visibleLivePositions(
         strategyMatches && sideMatches
     }
 
-fun visibleLogs(logs: List<LogEntry>, filter: LogFilter, query: String): List<LogEntry> {
+fun visibleLogs(
+    logs: List<LogEntry>,
+    filter: LogFilter,
+    query: String,
+    strategyFilter: StrategyFilter
+): List<LogEntry> {
     val normalizedQuery = query.trim().lowercase()
     return logs.filter { log ->
         val levelMatches = filter == LogFilter.All || log.level == filter
+        val strategyMatches = strategyFilter == StrategyFilter.All || log.strategy == strategyFilter
         val queryMatches = normalizedQuery.isEmpty() ||
             listOf(log.title, log.message, log.searchText, log.time)
                 .any { it.lowercase().contains(normalizedQuery) }
-        levelMatches && queryMatches
+        levelMatches && strategyMatches && queryMatches
     }
 }
 
 data class HeroKpi(val label: String, val value: String)
 data class MiniKpi(val label: String, val value: String, val subtext: String, val tone: Tone = Tone.Success)
 data class HomeSnapshot(
-    val totalEquity: String,
+    val totalBalance: String,
     val unrealizedPnl: String,
     val unrealizedPnlPct: String,
     val availableMargin: String,
     val inUse: String,
+    val marginInUse: String,
     val openPositionCount: String,
     val strategies: List<StrategySummary>,
     val activitySummary: ActivitySummary?,
@@ -271,6 +281,7 @@ data class RiskCheck(val title: String, val subtitle: String, val badge: String,
 data class HeartbeatRoutine(val name: String, val status: String, val age: String, val cadence: String, val tone: Tone)
 data class LogEntry(
     val level: LogFilter,
+    val strategy: StrategyFilter,
     val title: String,
     val message: String,
     val time: String,

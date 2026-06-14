@@ -96,15 +96,16 @@ object NjordMockData {
     )
 
     val logs = listOf(
-        LogEntry(LogFilter.Error, "Big Bang open failed · ETH Long", "Exchange rejected order: insufficient margin", "13:52", "Big Bang error open ETH long insufficient margin order rejected"),
-        LogEntry(LogFilter.Error, "WCR retraining failed", "Model artifact validation failed after training run", "13:22", "WCR model retraining failed artifact validation"),
-        LogEntry(LogFilter.Warn, "BTC near P&L stop threshold", "Current -8.7% · threshold -10%", "13:48", "Big Bang BTC near PnL stop threshold"),
-        LogEntry(LogFilter.Error, "WCR close failed · ARB Short", "Hyperliquid rejected order: insufficient margin after retry", "13:48", "WCR error close ARB short insufficient margin order rejected hyperliquid"),
-        LogEntry(LogFilter.Warn, "Weekly performance heartbeat late", "Expected 20m cadence · last success 26m ago", "13:34", "weekly report warning late performance heartbeat"),
-        LogEntry(LogFilter.Info, "Big Bang opened ETH Long", "Entry metadata persisted · probability 64%", "14:00", "Big Bang info opened ETH long entry persisted probability"),
-        LogEntry(LogFilter.Info, "WCR rebalance kept", "6 long / 6 short · no basket drift", "14:00", "WCR rebalance kept long short balanced"),
-        LogEntry(LogFilter.Warn, "Price API delayed · SOL", "Current price refreshed after second attempt", "11:22", "price api warning stale current price SOL"),
-        LogEntry(LogFilter.Info, "Hunch report persisted", "Risk-on signal · confidence 73%", "09:05", "hunch report risk-on persisted signal")
+        LogEntry(LogFilter.Error, StrategyFilter.BigBang, "Big Bang open failed · ETH Long", "Exchange rejected order: insufficient margin", "13:52", "Big Bang error open ETH long insufficient margin order rejected"),
+        LogEntry(LogFilter.Error, StrategyFilter.Wcr, "WCR retraining failed", "Model artifact validation failed after training run", "13:22", "WCR model retraining failed artifact validation"),
+        // parseStrategy("BTC near P&L stop threshold") returns All — BigBang assigned here as mock design intent
+        LogEntry(LogFilter.Warn, StrategyFilter.BigBang, "BTC near P&L stop threshold", "Current -8.7% · threshold -10%", "13:48", "Big Bang BTC near PnL stop threshold"),
+        LogEntry(LogFilter.Error, StrategyFilter.Wcr, "WCR close failed · ARB Short", "Hyperliquid rejected order: insufficient margin after retry", "13:48", "WCR error close ARB short insufficient margin order rejected hyperliquid"),
+        LogEntry(LogFilter.Warn, StrategyFilter.All, "Weekly performance heartbeat late", "Expected 20m cadence · last success 26m ago", "13:34", "weekly report warning late performance heartbeat"),
+        LogEntry(LogFilter.Info, StrategyFilter.BigBang, "Big Bang opened ETH Long", "Entry metadata persisted · probability 64%", "14:00", "Big Bang info opened ETH long entry persisted probability"),
+        LogEntry(LogFilter.Info, StrategyFilter.Wcr, "WCR rebalance kept", "6 long / 6 short · no basket drift", "14:00", "WCR rebalance kept long short balanced"),
+        LogEntry(LogFilter.Warn, StrategyFilter.All, "Price API delayed · SOL", "Current price refreshed after second attempt", "11:22", "price api warning stale current price SOL"),
+        LogEntry(LogFilter.Info, StrategyFilter.Hunch, "Hunch report persisted", "Risk-on signal · confidence 73%", "09:05", "hunch report risk-on persisted signal")
     )
 
     val cycles = listOf(

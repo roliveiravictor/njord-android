@@ -85,9 +85,10 @@ data class HomeApiHeartbeat(
 )
 
 data class HomeApiResponse(
-    val totalEquity: Double,
+    val totalBalance: Double,
     val availableMargin: Double,
     val inUse: Double,
+    val marginInUse: Double,
     val openPositionCount: Int,
     val unrealizedPnl: Double,
     val unrealizedPnlPct: Double,
@@ -132,90 +133,78 @@ sealed interface HunchReportResult {
     data class Error(val message: String) : HunchReportResult
 }
 
+sealed interface ApiPayloadResult {
+    data class Success(val body: String) : ApiPayloadResult
+    data class Error(val message: String) : ApiPayloadResult
+}
+
 object NjordApiClient {
 
     fun fetchHome(baseUrl: String, apiKey: String): HomeResult {
-        val url = "$baseUrl/v1/home"
-        Log.d("NjordApi", "fetchHome url=$url")
-        val connection = openConnection(url, apiKey)
-        return try {
-            val code = connection.responseCode
-            Log.d("NjordApi", "fetchHome responseCode=$code")
-            if (code !in 200..299) {
-                return HomeResult.Error("HTTP $code")
-            }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            Log.d("NjordApi", "fetchHome body=$body")
-            parseHomeResponse(body)
-        } catch (e: Exception) {
-            Log.e("NjordApi", "fetchHome error: ${e.javaClass.simpleName}: ${e.message}", e)
-            HomeResult.Error(e.message ?: "Unknown error")
-        } finally {
-            connection.disconnect()
+        return when (val payload = fetchHomePayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseHomeResponse(payload.body)
+            is ApiPayloadResult.Error -> HomeResult.Error(payload.message)
         }
     }
 
     fun fetchActivity(baseUrl: String, apiKey: String): ActivityResult {
-        val url = "$baseUrl/v1/activity"
-        Log.d("NjordApi", "fetchActivity url=$url")
-        val connection = openConnection(url, apiKey)
-        return try {
-            val code = connection.responseCode
-            Log.d("NjordApi", "fetchActivity responseCode=$code")
-            if (code !in 200..299) {
-                return ActivityResult.Error("HTTP $code")
-            }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            Log.d("NjordApi", "fetchActivity body=$body")
-            parseActivityResponse(body)
-        } catch (e: Exception) {
-            Log.e("NjordApi", "fetchActivity error: ${e.javaClass.simpleName}: ${e.message}", e)
-            ActivityResult.Error(e.message ?: "Unknown error")
-        } finally {
-            connection.disconnect()
+        return when (val payload = fetchActivityPayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseActivityResponse(payload.body)
+            is ApiPayloadResult.Error -> ActivityResult.Error(payload.message)
         }
     }
 
     fun fetchLogs(baseUrl: String, apiKey: String): LogsResult {
-        val connection = openConnection(logsUrl(baseUrl), apiKey)
-        return try {
-            if (connection.responseCode !in 200..299) {
-                return LogsResult.Error("HTTP ${connection.responseCode}")
-            }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            parseLogsResponse(body)
-        } catch (e: Exception) {
-            LogsResult.Error(e.message ?: "Unknown error")
-        } finally {
-            connection.disconnect()
+        return when (val payload = fetchLogsPayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseLogsResponse(payload.body)
+            is ApiPayloadResult.Error -> LogsResult.Error(payload.message)
         }
     }
 
     fun fetchHeartbeat(baseUrl: String, apiKey: String): HeartbeatResult {
-        val connection = openConnection("$baseUrl/v1/heartbeat", apiKey)
-        return try {
-            if (connection.responseCode !in 200..299) {
-                return HeartbeatResult.Error("HTTP ${connection.responseCode}")
-            }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            parseHeartbeatResponse(body)
-        } catch (e: Exception) {
-            HeartbeatResult.Error(e.message ?: "Unknown error")
-        } finally {
-            connection.disconnect()
+        return when (val payload = fetchHeartbeatPayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseHeartbeatResponse(payload.body)
+            is ApiPayloadResult.Error -> HeartbeatResult.Error(payload.message)
         }
     }
 
     fun fetchHunchReport(baseUrl: String, apiKey: String): HunchReportResult {
-        val connection = openConnection("$baseUrl/v1/reports/hunch?date=latest", apiKey)
+        return when (val payload = fetchHunchReportPayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseHunchReportResponse(payload.body)
+            is ApiPayloadResult.Error -> HunchReportResult.Error(payload.message)
+        }
+    }
+
+    fun fetchHomePayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload("$baseUrl/v1/home", apiKey, "fetchHome")
+
+    fun fetchActivityPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload("$baseUrl/v1/activity", apiKey, "fetchActivity")
+
+    fun fetchLogsPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload(logsUrl(baseUrl), apiKey, "fetchLogs")
+
+    fun fetchHeartbeatPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload("$baseUrl/v1/heartbeat", apiKey, "fetchHeartbeat")
+
+    fun fetchHunchReportPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload("$baseUrl/v1/reports/hunch?date=latest", apiKey, "fetchHunchReport")
+
+    private fun fetchPayload(url: String, apiKey: String, operation: String): ApiPayloadResult {
+        Log.d("NjordApi", "$operation url=$url")
+        val connection = openConnection(url, apiKey)
         return try {
-            if (connection.responseCode !in 200..299) {
-                return HunchReportResult.Error("HTTP ${connection.responseCode}")
+            val code = connection.responseCode
+            Log.d("NjordApi", "$operation responseCode=$code")
+            if (code !in 200..299) {
+                return ApiPayloadResult.Error("HTTP $code")
             }
             val body = connection.inputStream.bufferedReader().use { it.readText() }
-            parseHunchReportResponse(body)
+            Log.d("NjordApi", "$operation body=$body")
+            ApiPayloadResult.Success(body)
         } catch (e: Exception) {
-            HunchReportResult.Error(e.message ?: "Unknown error")
+            Log.e("NjordApi", "$operation error: ${e.javaClass.simpleName}: ${e.message}", e)
+            ApiPayloadResult.Error(e.message ?: "Unknown error")
         } finally {
             connection.disconnect()
         }
@@ -242,9 +231,10 @@ object NjordApiClient {
             }
             HomeResult.Success(
                 HomeApiResponse(
-                    totalEquity = root.optDouble("total_equity", 0.0),
+                    totalBalance = root.optDouble("total_balance", 0.0),
                     availableMargin = root.optDouble("available_margin", 0.0),
                     inUse = root.optDouble("in_use", 0.0),
+                    marginInUse = root.optDouble("margin_in_use", 0.0),
                     openPositionCount = root.optInt("open_position_count", 0),
                     unrealizedPnl = root.optDouble("unrealized_pnl", 0.0),
                     unrealizedPnlPct = root.optDouble("unrealized_pnl_pct", 0.0),
@@ -347,12 +337,13 @@ object NjordApiClient {
                     secondsOverdue = obj.optionalInt("seconds_overdue")
                 )
             }
+            val normalizedServices = services.withHealthyVpnDefault()
             HeartbeatResult.Success(
-                healthyCount = root.optInt("healthy_count", 0),
-                lateCount = root.optInt("late_count", 0),
-                criticalCount = root.optInt("critical_count", 0),
-                totalCount = root.optInt("total_count", services.size),
-                services = services
+                healthyCount = root.optInt("healthy_count", 0) + services.vpnHealthyDelta(),
+                lateCount = (root.optInt("late_count", 0) - services.vpnLateDelta()).coerceAtLeast(0),
+                criticalCount = (root.optInt("critical_count", 0) - services.vpnCriticalDelta()).coerceAtLeast(0),
+                totalCount = root.optInt("total_count", services.size) + services.vpnMissingDelta(),
+                services = normalizedServices
             )
         } catch (e: Exception) {
             HeartbeatResult.Error(e.message ?: "Parse error")
@@ -398,7 +389,7 @@ object NjordApiClient {
         }
 
     internal fun logsUrl(baseUrl: String): String =
-        "$baseUrl/v1/logs?hours=24&limit=5000"
+        "$baseUrl/v1/logs?hours=24&limit=5000&exclude_heartbeat=true"
 }
 
 private fun JSONObject.optionalString(name: String): String? =
@@ -426,3 +417,48 @@ private fun JSONObject.optionalLayerScores(): Map<String, Double?> {
         if (layerObject.isNull(key)) null else layerObject.optDouble(key)
     }
 }
+
+private fun List<HeartbeatApiService>.withHealthyVpnDefault(): List<HeartbeatApiService> {
+    val vpnIndex = indexOfFirst { it.name == "vpn_heartbeat" }
+    if (vpnIndex == -1) {
+        return this + defaultHealthyVpnHeartbeat()
+    }
+    val vpn = this[vpnIndex]
+    if (!vpn.isAbsentVpnHeartbeat()) {
+        return this
+    }
+    return toMutableList().also { services ->
+        services[vpnIndex] = vpn.copy(status = "healthy", secondsOverdue = null)
+    }
+}
+
+private fun List<HeartbeatApiService>.vpnHealthyDelta(): Int =
+    when {
+        none { it.name == "vpn_heartbeat" } -> 1
+        any { it.isAbsentVpnHeartbeat() } -> 1
+        else -> 0
+    }
+
+private fun List<HeartbeatApiService>.vpnMissingDelta(): Int =
+    if (none { it.name == "vpn_heartbeat" }) 1 else 0
+
+private fun List<HeartbeatApiService>.vpnLateDelta(): Int =
+    if (any { it.isAbsentVpnHeartbeat() && it.status.equals("late", ignoreCase = true) }) 1 else 0
+
+private fun List<HeartbeatApiService>.vpnCriticalDelta(): Int =
+    if (any { it.isAbsentVpnHeartbeat() && it.status.equals("critical", ignoreCase = true) }) 1 else 0
+
+private fun HeartbeatApiService.isAbsentVpnHeartbeat(): Boolean =
+    name == "vpn_heartbeat" &&
+        lastSeenAt == null &&
+        !status.equals("healthy", ignoreCase = true)
+
+private fun defaultHealthyVpnHeartbeat(): HeartbeatApiService =
+    HeartbeatApiService(
+        name = "vpn_heartbeat",
+        displayName = "VPN heartbeat",
+        status = "healthy",
+        lastSeenAt = null,
+        expectedCadenceSeconds = 1200,
+        secondsOverdue = null
+    )

@@ -44,11 +44,18 @@ prototype.
   are cached under the app `cacheDir` in `coin-logos/` so later cold starts can
   render from local cache before trying the network. Unknown labels, cache
   misses, and failed downloads keep the native initials badge.
+- Added offline-first API caching for the remote-backed Home, Activity,
+  Heartbeat, Logs, and Reports views. Each view reads its last successful raw
+  JSON payload from private app storage first, renders that cached data
+  immediately when available, then refreshes from the API and replaces the cache
+  only after a successful parse.
 
 ## Static Data Boundary
 
-All UI data currently comes from `NjordMockData`. Screen state is local Compose
-state reduced through `NjordAction` and `reduce`.
+The app now uses a hybrid data boundary. Static prototype-only surfaces still
+come from `NjordMockData`, while Home, Activity, Heartbeat, Logs, and Reports
+are API-backed and offline-first. Screen state remains local Compose state
+reduced through `NjordAction` and `reduce`.
 
 Future API integration should replace `NjordMockData` with a repository-backed
 state source while preserving:
@@ -60,9 +67,9 @@ state source while preserving:
 
 ## Non-Goals For This Step
 
-- No API calls.
 - No authentication.
-- No persistence beyond in-memory UI state, except the app-cache coin logo
-  files used to avoid refetching successful downloads.
+- No database-backed persistence layer. API view snapshots are stored as raw
+  endpoint JSON files under `filesDir/api-cache/`; coin logos remain cached
+  under `cacheDir/coin-logos/`.
 - Coin icons may load remote logo images; cached logos are preferred when
   available, and initials remain the native fallback.

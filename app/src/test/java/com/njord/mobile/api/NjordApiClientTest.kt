@@ -1,5 +1,6 @@
 package com.njord.mobile.api
 
+import com.njord.mobile.model.StrategyFilter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -20,7 +21,7 @@ class NjordApiClientTest {
     fun logsUrl_requestsFullServerPageForLatest24Hours() {
         val url = NjordApiClient.logsUrl("https://noatun.dev")
 
-        assertEquals("https://noatun.dev/v1/logs?hours=24&limit=5000", url)
+        assertEquals("https://noatun.dev/v1/logs?hours=24&limit=5000&exclude_heartbeat=true", url)
     }
 
     @Test
@@ -73,9 +74,10 @@ class NjordApiClientTest {
     fun parseHomeResponse_wellFormedJson_returnsSuccessWithoutMappingIncidents() {
         val json = """
             {
-              "total_equity": 18420.0,
+              "total_balance": 18420.0,
               "available_margin": 7800.0,
               "in_use": 3100.0,
+              "margin_in_use": 4200.0,
               "open_position_count": 18,
               "unrealized_pnl": 428.0,
               "unrealized_pnl_pct": 3.8,
@@ -116,7 +118,7 @@ class NjordApiClientTest {
 
         assertTrue(result is HomeResult.Success)
         val response = (result as HomeResult.Success).response
-        assertEquals(18420.0, response.totalEquity, 0.0001)
+        assertEquals(18420.0, response.totalBalance, 0.0001)
         assertEquals(1, response.strategies.size)
         assertEquals("Big Bang", response.strategies[0].name)
         assertEquals(listOf("HYPE", "ETH"), response.strategies[0].symbols)
@@ -135,9 +137,10 @@ class NjordApiClientTest {
     @Test
     fun mapApiHome_formatsSnapshotForHomeCards() {
         val response = HomeApiResponse(
-            totalEquity = 18420.0,
+            totalBalance = 18420.0,
             availableMargin = 7800.0,
             inUse = 3100.0,
+            marginInUse = 4200.0,
             openPositionCount = 18,
             unrealizedPnl = -428.0,
             unrealizedPnlPct = -3.8,
@@ -162,16 +165,112 @@ class NjordApiClientTest {
 
         val snapshot = mapApiHome(response)
 
-        assertEquals("\$18,420.00", snapshot.totalEquity)
+        assertEquals("\$18,420.00", snapshot.totalBalance)
         assertEquals("-\$428.00", snapshot.unrealizedPnl)
         assertEquals("-3.8% unrealized", snapshot.unrealizedPnlPct)
         assertEquals("\$7.8K", snapshot.availableMargin)
         assertEquals("\$3.1K", snapshot.inUse)
+        assertEquals("\$4.2K", snapshot.marginInUse)
         assertEquals("18 Pos", snapshot.openPositionCount)
         assertEquals("2", snapshot.activitySummary?.opened)
         assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
         assertEquals("+\$184.00", snapshot.strategies[0].pnl)
         assertEquals("+2.6%", snapshot.strategies[0].pct)
+    }
+
+    @Test
+    fun mapApiActivity_includesAllReturnedCyclesAndNormalizesSymbols() {
+        val response = ActivityApiResponse(
+            cycles = listOf(
+                ActivityApiCycle(
+                    timestamp = "2026-06-14T00:07:44.757602+00:00",
+                    cycleStatus = "complete",
+                    totalOpened = 0,
+                    totalClosed = 0,
+                    totalKept = 1,
+                    strategies = listOf(
+                        ActivityApiStrategy(
+                            name = "big_bang",
+                            opened = emptyList(),
+                            closed = emptyList(),
+                            kept = listOf(ActivityApiPosition("ATOM/USDT:USDT", "long"))
+                        )
+                    )
+                ),
+                ActivityApiCycle(
+                    timestamp = "2026-06-14T00:03:29.689404+00:00",
+                    cycleStatus = "complete",
+                    totalOpened = 2,
+                    totalClosed = 1,
+                    totalKept = 0,
+                    strategies = listOf(
+                        ActivityApiStrategy(
+                            name = "wcr",
+                            opened = listOf(
+                                ActivityApiPosition("TON/USDT", "long"),
+                                ActivityApiPosition("ENA/USDT", "short")
+                            ),
+                            closed = listOf(ActivityApiPosition("BTC/USDT", "long")),
+                            kept = emptyList()
+                        )
+                    )
+                )
+            )
+        )
+
+        val (summary, cycles) = mapApiActivity(response)
+
+        assertEquals("2", summary.opened)
+        assertEquals("1", summary.closed)
+        assertEquals("1", summary.kept)
+        assertEquals(listOf("Big Bang", "WCR"), cycles.map { it.strategy })
+        assertEquals(listOf("ATOM"), cycles[0].actions.map { it.symbol })
+        assertEquals(listOf("TON", "ENA", "BTC"), cycles[1].actions.map { it.symbol })
+        assertEquals(listOf("Long", "Short", "Long"), cycles[1].actions.map { it.side })
+    }
+
+    @Test
+    fun mapApiActivity_mergesRepeatedStrategyRowsAcrossRecentCycles() {
+        val response = ActivityApiResponse(
+            cycles = listOf(
+                ActivityApiCycle(
+                    timestamp = "2026-06-14T00:03:29.689404+00:00",
+                    cycleStatus = "complete",
+                    totalOpened = 1,
+                    totalClosed = 1,
+                    totalKept = 0,
+                    strategies = listOf(
+                        ActivityApiStrategy(
+                            name = "wcr",
+                            opened = listOf(ActivityApiPosition("PENGU/USDT", "long")),
+                            closed = listOf(ActivityApiPosition("BCH/USDT", "short")),
+                            kept = emptyList()
+                        )
+                    )
+                ),
+                ActivityApiCycle(
+                    timestamp = "2026-06-13T00:01:45.039083+00:00",
+                    cycleStatus = "complete",
+                    totalOpened = 0,
+                    totalClosed = 1,
+                    totalKept = 0,
+                    strategies = listOf(
+                        ActivityApiStrategy(
+                            name = "wcr",
+                            opened = emptyList(),
+                            closed = listOf(ActivityApiPosition("FET/USDT", "short")),
+                            kept = emptyList()
+                        )
+                    )
+                )
+            )
+        )
+
+        val (_, cycles) = mapApiActivity(response)
+
+        assertEquals(1, cycles.size)
+        assertEquals("WCR", cycles.single().strategy)
+        assertEquals(listOf("PENGU", "BCH", "FET"), cycles.single().actions.map { it.symbol })
     }
 
     @Test
@@ -291,6 +390,96 @@ class NjordApiClientTest {
 
         assertTrue(result is HeartbeatResult.Error)
     }
+
+    @Test
+    fun parseHeartbeatResponse_addsHealthyVpnWhenServiceMissing() {
+        val json = """
+            {
+              "healthy_count": 0,
+              "late_count": 0,
+              "critical_count": 0,
+              "total_count": 0,
+              "services": []
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHeartbeatResponse(json)
+
+        assertTrue(result is HeartbeatResult.Success)
+        val success = result as HeartbeatResult.Success
+        assertEquals(1, success.healthyCount)
+        assertEquals(0, success.lateCount)
+        assertEquals(0, success.criticalCount)
+        assertEquals(1, success.totalCount)
+        assertEquals("vpn_heartbeat", success.services.single().name)
+        assertEquals("healthy", success.services.single().status)
+        assertEquals(null, success.services.single().lastSeenAt)
+    }
+
+    @Test
+    fun parseHeartbeatResponse_treatsAbsentVpnHeartbeatAsHealthy() {
+        val json = """
+            {
+              "healthy_count": 0,
+              "late_count": 0,
+              "critical_count": 0,
+              "total_count": 1,
+              "services": [
+                {
+                  "name": "vpn_heartbeat",
+                  "display_name": "VPN heartbeat",
+                  "status": "unknown",
+                  "last_seen_at": null,
+                  "expected_cadence_seconds": 1200,
+                  "seconds_overdue": null
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHeartbeatResponse(json)
+
+        assertTrue(result is HeartbeatResult.Success)
+        val success = result as HeartbeatResult.Success
+        assertEquals(1, success.healthyCount)
+        assertEquals(0, success.lateCount)
+        assertEquals(0, success.criticalCount)
+        assertEquals(1, success.totalCount)
+        assertEquals("healthy", success.services.single().status)
+    }
+
+    @Test
+    fun mapApiEntries_bigBangTitle_assignsBigBangStrategy() {
+        val entries = listOf(makeApiEntry("INFO", "Big Bang open failed · ETH Long", "", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.BigBang, mapApiEntries(entries)[0].strategy)
+    }
+
+    @Test
+    fun mapApiEntries_wcrTitle_assignsWcrStrategy() {
+        val entries = listOf(makeApiEntry("WARNING", "WCR retraining failed", "", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.Wcr, mapApiEntries(entries)[0].strategy)
+    }
+
+    @Test
+    fun mapApiEntries_hunchTitle_assignsHunchStrategy() {
+        val entries = listOf(makeApiEntry("INFO", "Hunch report persisted", "", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.Hunch, mapApiEntries(entries)[0].strategy)
+    }
+
+    @Test
+    fun mapApiEntries_unrecognizedTitle_assignsAllStrategy() {
+        val entries = listOf(makeApiEntry("WARN", "Weekly performance heartbeat late", "", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.All, mapApiEntries(entries)[0].strategy)
+    }
+
+    @Test
+    fun mapApiEntries_caseInsensitiveTitle_assignsStrategy() {
+        val entries = listOf(makeApiEntry("INFO", "BIG BANG position opened", "", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.BigBang, mapApiEntries(entries)[0].strategy)
+    }
+
+    private fun makeApiEntry(level: String, title: String, message: String, timestamp: String) =
+        LogApiEntry(level = level, title = title, message = message, timestamp = timestamp)
 
     @Test
     fun mapApiHeartbeat_formatsRowsAndCountsForUi() {

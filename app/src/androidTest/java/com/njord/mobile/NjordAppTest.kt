@@ -99,6 +99,30 @@ class NjordAppTest {
     }
 
     @Test
+    fun remoteBackedScreens_doNotShowLoadingCopy() {
+        compose.onAllNodesWithText("Loading…").assertCountEquals(0)
+        compose.onAllNodesWithText("Loading strategies…").assertCountEquals(0)
+        compose.onAllNodesWithText("Loading latest cycle…").assertCountEquals(0)
+
+        compose.onNodeWithTag("nav-More").performClick()
+        compose.onNodeWithTag("more-Activity").performClick()
+        compose.onAllNodesWithText("Loading activity…").assertCountEquals(0)
+
+        compose.onNodeWithTag("nav-More").performClick()
+        compose.onNodeWithTag("more-Reports").performClick()
+        compose.onAllNodesWithText("Loading Hunch report…").assertCountEquals(0)
+
+        compose.onNodeWithTag("nav-More").performClick()
+        compose.onNodeWithTag("more-Heartbeat").performClick()
+        compose.onAllNodesWithText("Loading heartbeat…").assertCountEquals(0)
+        compose.onAllNodesWithText("Loading service health…").assertCountEquals(0)
+
+        compose.onNodeWithTag("nav-More").performClick()
+        compose.onNodeWithTag("more-Logs").performClick()
+        compose.onAllNodesWithText("Loading logs…").assertCountEquals(0)
+    }
+
+    @Test
     fun moreScreen_matchesGroupedReferenceLayout() {
         compose.onNodeWithTag("nav-More").performClick()
 

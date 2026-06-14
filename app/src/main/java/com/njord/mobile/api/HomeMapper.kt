@@ -11,11 +11,12 @@ private val USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US)
 
 internal fun mapApiHome(response: HomeApiResponse): HomeSnapshot =
     HomeSnapshot(
-        totalEquity = USD_FORMATTER.format(response.totalEquity),
+        totalBalance = USD_FORMATTER.format(response.totalBalance),
         unrealizedPnl = formatSignedCurrency(response.unrealizedPnl),
         unrealizedPnlPct = "${formatSignedNumber(response.unrealizedPnlPct)}% unrealized",
         availableMargin = formatCompactCurrency(response.availableMargin),
         inUse = formatCompactCurrency(response.inUse),
+        marginInUse = formatCompactCurrency(response.marginInUse),
         openPositionCount = "${response.openPositionCount} Pos",
         strategies = response.strategies.map(::mapHomeStrategy),
         activitySummary = response.latestCycle?.let {
