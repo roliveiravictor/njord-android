@@ -98,6 +98,7 @@ import com.njord.mobile.model.Destination
 import com.njord.mobile.model.HeartbeatRoutine
 import com.njord.mobile.model.Incident
 import com.njord.mobile.model.LayerScore
+import com.njord.mobile.model.LiveAnalyticsSnapshot
 import com.njord.mobile.model.LivePosition
 import com.njord.mobile.model.LogEntry
 import com.njord.mobile.model.LogFilter
@@ -108,6 +109,7 @@ import com.njord.mobile.api.ApiPayloadResult
 import com.njord.mobile.api.HeartbeatResult
 import com.njord.mobile.api.HomeResult
 import com.njord.mobile.api.HunchReportResult
+import com.njord.mobile.api.LiveResult
 import com.njord.mobile.api.LogsResult
 import com.njord.mobile.api.NjordApiCache
 import com.njord.mobile.api.NjordApiClient
@@ -116,6 +118,7 @@ import com.njord.mobile.api.PortfolioResult
 import com.njord.mobile.api.mapApiActivity
 import com.njord.mobile.api.mapApiHeartbeat
 import com.njord.mobile.api.mapApiHome
+import com.njord.mobile.api.mapApiLive
 import com.njord.mobile.api.mapApiPortfolio
 import com.njord.mobile.api.mapApiReport
 import com.njord.mobile.api.mapApiEntries
@@ -160,6 +163,9 @@ private val Success = Color(0xFF00E676)
 private val Warning = Color(0xFFFFD166)
 private val Danger = Color(0xFFFF2D55)
 private val Info = Color(0xFF9CB7FF)
+private val ActivityKept = Color(0xFFFF9F43)
+private val ActivityOpen = Color(0xFF4DA3FF)
+private val ActivityClosed = Color(0xFFB084FF)
 private val PortfolioTileSurface = Color(0xFF171C24)
 private val LiveFilterSurface = Color(0xFF15171B)
 private val LiveStrategyFilterActive = Color(0xFF263846)
@@ -510,13 +516,47 @@ private fun fallbackPortfolioSnapshot(): PortfolioSnapshot =
 
 @Composable
 private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val context = LocalContext.current.applicationContext
     val positions = visibleLivePositions(
-        NjordMockData.livePositions,
+        state.livePositions,
         state.liveStrategyFilter,
         state.liveSideFilter
     )
-    val incidents = NjordMockData.incidents
-        .filter { it.tone == Tone.Danger && it.id !in state.dismissedIncidentIds }
+    val incidents = state.liveIncidents.filter { it.id !in state.dismissedIncidentIds }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            NjordApiCache.read(context.filesDir, ApiCacheKey.Live)?.let { cachedBody ->
+                when (val cached = NjordApiClient.parseLiveResponse(cachedBody)) {
+                    is LiveResult.Success -> {
+                        val (cachedPositions, cachedAnalytics, cachedIncidents) = mapApiLive(cached.response)
+                        dispatchUiAction(onAction, NjordAction.LiveLoaded(cachedPositions, cachedAnalytics, cachedIncidents))
+                    }
+                    is LiveResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Live)
+                    else -> {}
+                }
+            }
+
+            dispatchUiAction(onAction, NjordAction.LiveLoading)
+            when (val result = NjordApiClient.fetchLivePayload(
+                com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+                com.njord.mobile.BuildConfig.NJORD_API_KEY
+            )) {
+                is ApiPayloadResult.Success -> {
+                    when (val parsed = NjordApiClient.parseLiveResponse(result.body)) {
+                        is LiveResult.Success -> {
+                            NjordApiCache.write(context.filesDir, ApiCacheKey.Live, result.body)
+                            val (livePositions, liveAnalytics, liveIncidents) = mapApiLive(parsed.response)
+                            dispatchUiAction(onAction, NjordAction.LiveLoaded(livePositions, liveAnalytics, liveIncidents))
+                        }
+                        is LiveResult.Error -> dispatchUiAction(onAction, NjordAction.LiveError)
+                        else -> {}
+                    }
+                }
+                is ApiPayloadResult.Error -> dispatchUiAction(onAction, NjordAction.LiveError)
+            }
+        }
+    }
 
     Column(
         Modifier.padding(horizontal = 16.dp),
@@ -529,6 +569,9 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             onSideSelect = { onAction(NjordAction.SetLiveSideFilter(it)) }
         )
         LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
+        if (state.liveError) {
+            ApiErrorCard("Remote live data unavailable. Showing the last cached live snapshot.")
+        }
         if (positions.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLivePositions")) {
                 Text("No open positions match this filter.", color = TextMuted, fontSize = 13.sp)
@@ -538,7 +581,7 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 LivePositionCard(position) { onAction(NjordAction.SelectPosition(position)) }
             }
         }
-        LiveAnalyticsSections()
+        LiveAnalyticsSections(state.liveAnalytics)
     }
 }
 
@@ -759,10 +802,10 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val context = LocalContext.current.applicationContext
     val logs = visibleLogs(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter)
-    var expandedLogKey by remember { mutableStateOf<String?>(null) }
+    var expandedLogIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter) {
-        expandedLogKey = null
+        expandedLogIndex = null
     }
 
     LaunchedEffect(Unit) {
@@ -829,13 +872,12 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 Text("No logs match this filter.", color = TextMuted)
             }
         } else {
-            logs.forEach { log ->
-                val logKey = "${log.time}|${log.level}|${log.title}|${log.message}"
+            logs.forEachIndexed { index, log ->
                 LogRow(
                     log = log,
-                    expanded = expandedLogKey == logKey,
+                    expanded = expandedLogIndex == index,
                     onClick = {
-                        expandedLogKey = if (expandedLogKey == logKey) null else logKey
+                        expandedLogIndex = if (expandedLogIndex == index) null else index
                     }
                 )
             }
@@ -1786,46 +1828,45 @@ private fun LiveFooterValue(label: String, value: String, modifier: Modifier = M
 }
 
 @Composable
-private fun LiveAnalyticsSections() {
+private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
+    if (analytics == null) return
+
     SectionTitle("Open P&L by strategy")
     NjordCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Text("Current contribution", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-            Text("+$428", color = Success, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                analytics.totalContribution,
+                color = toneColor(analytics.totalContributionTone),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
         }
         Spacer(Modifier.height(16.dp))
-        LiveContributionRow("Big Bang", 0.82f, "+$303", Tone.Success)
-        LiveContributionRow("WCR", 0.50f, "+$184", Tone.Success)
-        LiveContributionRow("Hunch", 0.18f, "-$59", Tone.Danger)
+        if (analytics.strategyContributions.isEmpty()) {
+            Text("No strategy contribution data available yet.", color = TextMuted, fontSize = 13.sp)
+        } else {
+            analytics.strategyContributions.forEach {
+                LiveContributionRow(it.strategy, it.progress, it.value, it.tone)
+            }
+        }
     }
 
     SectionTitle("Live summary")
-    LiveMetricPanel(
-        items = listOf(
-            MiniKpi("POSITIONS", "18", "Current open", Tone.Primary),
-            MiniKpi("LONG", "12", "66.7% of book", Tone.Muted),
-            MiniKpi("SHORT", "6", "33.3% of book", Tone.Muted),
-            MiniKpi("OPEN P&L", "+$428", "All strategies", Tone.Success),
-            MiniKpi("CAPITAL", "$10.4k", "Displayed filter", Tone.Muted),
-            MiniKpi("AVG AGE", "11h", "Current cycle", Tone.Muted)
-        )
-    )
+    LiveMetricPanel(items = analytics.summaryItems)
 
     SectionTitle("Live metrics")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        LiveOutcomeTile("LARGEST WINNER", "HYPE", "+$186", "+8.4%", Tone.Success, Modifier.weight(1f))
-        LiveOutcomeTile("LARGEST LOSER", "SOL", "-$48", "-1.2%", Tone.Danger, Modifier.weight(1f))
+        analytics.largestWinner?.let {
+            LiveOutcomeTile("LARGEST WINNER", it.symbol, it.amount, it.percent, it.tone, Modifier.weight(1f))
+        } ?: LiveOutcomeTile("LARGEST WINNER", "N/A", "--", "--", Tone.Muted, Modifier.weight(1f))
+        analytics.largestLoser?.let {
+            LiveOutcomeTile("LARGEST LOSER", it.symbol, it.amount, it.percent, it.tone, Modifier.weight(1f))
+        } ?: LiveOutcomeTile("LARGEST LOSER", "N/A", "--", "--", Tone.Muted, Modifier.weight(1f))
     }
 
     SectionTitle("Position integrity")
-    LiveIntegrityPanel(
-        items = listOf(
-            MiniKpi("MATCHED", "18", "Local + exchange", Tone.Success),
-            MiniKpi("UNCLAIMED", "1", "Exchange only", Tone.Warning),
-            MiniKpi("MISSING", "0", "Local only", Tone.Muted),
-            MiniKpi("DUPLICATE", "0", "Multi-owner", Tone.Muted)
-        )
-    )
+    LiveIntegrityPanel(items = analytics.integrityItems)
 }
 
 @Composable
@@ -2106,24 +2147,88 @@ private fun HeartbeatRoutinePill(label: String, tone: Tone) {
 
 @Composable
 private fun LogRow(log: LogEntry, expanded: Boolean, onClick: () -> Unit) {
-    NjordCard(Modifier.testTag("logRow"), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Badge(log.level.label, log.level.toTone())
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(log.title, color = TextPrimary, fontWeight = FontWeight.Bold)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        border = BorderStroke(1.dp, Outline.copy(alpha = 0.65f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .testTag("logRow")
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Badge(log.level.label, log.level.toTone())
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    log.title,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = if (expanded) 2 else 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(log.time, color = TextMuted2, fontSize = 12.sp)
+            }
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Surface2)
+                        .border(1.dp, Outline.copy(alpha = 0.75f), RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                        .testTag("expandedLogMessage")
+                ) {
+                    Text(
+                        log.message.wrapLongTokens(),
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        overflow = TextOverflow.Clip
+                    )
+                }
+            } else {
                 Text(
                     log.message,
                     color = TextMuted,
                     fontSize = 12.sp,
-                    maxLines = if (expanded) Int.MAX_VALUE else 2,
-                    overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(log.time, color = TextMuted2, fontSize = 12.sp)
+            Button(
+                onClick = onClick,
+                modifier = Modifier.testTag("logRowToggle"),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PrimaryContainer,
+                    contentColor = Primary
+                ),
+                shape = RoundedCornerShape(999.dp)
+            ) {
+                Text(
+                    if (expanded) "Hide message" else "Show full message",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
     }
 }
+
+private fun String.wrapLongTokens(chunkSize: Int = 48): String =
+    splitToSequence(' ').joinToString(" ") { token ->
+        if (token.length <= chunkSize) {
+            token
+        } else {
+            token.chunked(chunkSize).joinToString("\n")
+        }
+    }
 
 @Composable
 private fun MoreRow(title: String, icon: ImageVector, onClick: () -> Unit) {
@@ -2151,16 +2256,19 @@ private fun MoreRow(title: String, icon: ImageVector, onClick: () -> Unit) {
 
 @Composable
 private fun ActivitySummaryChip(value: String, label: String) {
+    val color = activityActionColor(label)
+
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(Surface3.copy(alpha = 0.72f))
+            .background(color.copy(alpha = 0.16f))
+            .border(1.dp, color.copy(alpha = 0.36f), RoundedCornerShape(999.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.width(6.dp))
-        Text(label, color = TextMuted, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+        Text(label, color = color, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -2246,16 +2354,26 @@ private fun ActivityTableRow(action: ActivityAction, showBottomPadding: Boolean)
 
 @Composable
 private fun ActivityActionBadge(label: String, modifier: Modifier = Modifier) {
+    val color = activityActionColor(label)
+
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(999.dp))
-                .border(1.dp, Color(0xFF464B54), RoundedCornerShape(999.dp))
+                .background(color.copy(alpha = 0.14f))
+                .border(1.dp, color.copy(alpha = 0.42f), RoundedCornerShape(999.dp))
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
-            Text(label, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
+            Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
         }
     }
+}
+
+private fun activityActionColor(label: String): Color = when {
+    label.startsWith("kept", ignoreCase = true) -> ActivityKept
+    label.startsWith("open", ignoreCase = true) -> ActivityOpen
+    label.startsWith("closed", ignoreCase = true) -> ActivityClosed
+    else -> TextPrimary
 }
 
 @Composable

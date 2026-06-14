@@ -5,6 +5,7 @@ import java.io.File
 enum class ApiCacheKey(val fileName: String) {
     Home("home.json"),
     Activity("activity.json"),
+    Live("live.json"),
     PortfolioAll("portfolio-all.json"),
     PortfolioBigBang("portfolio-big-bang.json"),
     PortfolioWcr("portfolio-wcr.json"),

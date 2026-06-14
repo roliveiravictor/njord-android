@@ -78,6 +78,11 @@ data class NjordUiState(
     val activityCycles: List<StrategyCycle> = emptyList(),
     val activityLoading: Boolean = false,
     val activityError: Boolean = false,
+    val livePositions: List<LivePosition> = emptyList(),
+    val liveAnalytics: LiveAnalyticsSnapshot? = null,
+    val liveIncidents: List<Incident> = emptyList(),
+    val liveLoading: Boolean = false,
+    val liveError: Boolean = false,
     val dismissedIncidentIds: Set<String> = emptySet(),
     val selectedIncident: Incident? = null,
     val selectedPosition: LivePosition? = null
@@ -99,6 +104,13 @@ sealed interface NjordAction {
     data object ActivityLoading : NjordAction
     data class ActivityLoaded(val summary: ActivitySummary, val cycles: List<StrategyCycle>) : NjordAction
     data object ActivityError : NjordAction
+    data object LiveLoading : NjordAction
+    data class LiveLoaded(
+        val positions: List<LivePosition>,
+        val analytics: LiveAnalyticsSnapshot?,
+        val incidents: List<Incident>
+    ) : NjordAction
+    data object LiveError : NjordAction
     data object LogsLoading : NjordAction
     data class LogsLoaded(val entries: List<LogEntry>) : NjordAction
     data object LogsError : NjordAction
@@ -153,6 +165,15 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
             activityError = false
         )
         NjordAction.ActivityError -> state.copy(activityLoading = false, activityError = true)
+        NjordAction.LiveLoading -> state.copy(liveLoading = true, liveError = false)
+        is NjordAction.LiveLoaded -> state.copy(
+            livePositions = action.positions,
+            liveAnalytics = action.analytics,
+            liveIncidents = action.incidents,
+            liveLoading = false,
+            liveError = false
+        )
+        NjordAction.LiveError -> state.copy(liveLoading = false, liveError = true)
         NjordAction.LogsLoading -> state.copy(logsLoading = true, logsError = false)
         is NjordAction.LogsLoaded -> state.copy(logs = action.entries, logsLoading = false, logsError = false)
         NjordAction.LogsError -> state.copy(logsLoading = false, logsError = true)
@@ -293,6 +314,30 @@ data class Incident(
     val tone: Tone,
     val age: String,
     val reason: String
+)
+
+data class LiveAnalyticsSnapshot(
+    val totalContribution: String,
+    val totalContributionTone: Tone,
+    val strategyContributions: List<LiveContribution>,
+    val summaryItems: List<MiniKpi>,
+    val largestWinner: LiveOutcome?,
+    val largestLoser: LiveOutcome?,
+    val integrityItems: List<MiniKpi>
+)
+
+data class LiveContribution(
+    val strategy: String,
+    val progress: Float,
+    val value: String,
+    val tone: Tone
+)
+
+data class LiveOutcome(
+    val symbol: String,
+    val amount: String,
+    val percent: String,
+    val tone: Tone
 )
 
 data class PortfolioPosition(

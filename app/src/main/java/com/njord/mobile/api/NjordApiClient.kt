@@ -151,6 +151,74 @@ data class PortfolioApiResponse(
     val monthlyStats: PortfolioMonthlyStatsApiResponse
 )
 
+data class LiveApiPosition(
+    val id: String,
+    val symbol: String,
+    val side: String,
+    val strategy: String,
+    val strategyName: String,
+    val opened: String,
+    val entryPrice: Double,
+    val currentPrice: Double,
+    val capital: Double,
+    val quantity: Double?,
+    val unrealizedPnl: Double,
+    val unrealizedPnlPct: Double,
+    val trendUp: Boolean
+)
+
+data class LiveApiStrategyContribution(
+    val strategyName: String,
+    val unrealizedPnl: Double,
+    val contributionPct: Double
+)
+
+data class LiveApiSummary(
+    val positionCount: Int,
+    val longCount: Int,
+    val shortCount: Int,
+    val longPct: Double,
+    val shortPct: Double,
+    val totalUnrealizedPnl: Double,
+    val totalCapital: Double,
+    val avgAgeHours: Double
+)
+
+data class LiveApiMetrics(
+    val largestWinner: LiveApiPosition?,
+    val largestLoser: LiveApiPosition?
+)
+
+data class LiveApiIntegrity(
+    val matched: Int,
+    val unclaimed: Int,
+    val missing: Int,
+    val duplicate: Int
+)
+
+data class LiveApiAnalytics(
+    val strategyContributions: List<LiveApiStrategyContribution>,
+    val liveSummary: LiveApiSummary?,
+    val liveMetrics: LiveApiMetrics?,
+    val integrity: LiveApiIntegrity?
+)
+
+data class LiveApiIncident(
+    val timestamp: String,
+    val level: String,
+    val category: String,
+    val title: String,
+    val message: String,
+    val strategy: String?,
+    val symbol: String?
+)
+
+data class LiveApiResponse(
+    val positions: List<LiveApiPosition>,
+    val analytics: LiveApiAnalytics?,
+    val incidents: List<LiveApiIncident>
+)
+
 sealed interface HomeResult {
     data object Loading : HomeResult
     data class Success(val response: HomeApiResponse) : HomeResult
@@ -167,6 +235,12 @@ sealed interface ActivityResult {
     data object Loading : ActivityResult
     data class Success(val response: ActivityApiResponse) : ActivityResult
     data class Error(val message: String) : ActivityResult
+}
+
+sealed interface LiveResult {
+    data object Loading : LiveResult
+    data class Success(val response: LiveApiResponse) : LiveResult
+    data class Error(val message: String) : LiveResult
 }
 
 sealed interface LogsResult {
@@ -214,6 +288,13 @@ object NjordApiClient {
         }
     }
 
+    fun fetchLive(baseUrl: String, apiKey: String): LiveResult {
+        return when (val payload = fetchLivePayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseLiveResponse(payload.body)
+            is ApiPayloadResult.Error -> LiveResult.Error(payload.message)
+        }
+    }
+
     fun fetchPortfolio(baseUrl: String, apiKey: String, strategy: String): PortfolioResult {
         return when (val payload = fetchPortfolioPayload(baseUrl, apiKey, strategy)) {
             is ApiPayloadResult.Success -> parsePortfolioResponse(payload.body)
@@ -247,6 +328,9 @@ object NjordApiClient {
 
     fun fetchActivityPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload("$baseUrl/v1/activity?limit=5", apiKey, "fetchActivity")
+
+    fun fetchLivePayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload(liveUrl(baseUrl), apiKey, "fetchLive")
 
     fun fetchPortfolioPayload(baseUrl: String, apiKey: String, strategy: String): ApiPayloadResult =
         fetchPayload(portfolioUrl(baseUrl, strategy), apiKey, "fetchPortfolio")
@@ -406,6 +490,104 @@ object NjordApiClient {
         }
     }
 
+    internal fun parseLiveResponse(json: String): LiveResult {
+        return try {
+            val root = JSONObject(json)
+            val positionsArray = root.optJSONArray("positions")
+                ?: return LiveResult.Error("Missing 'positions' key")
+            val positions = (0 until positionsArray.length()).mapNotNull { i ->
+                parseLivePosition(positionsArray.optJSONObject(i))
+            }
+            val analyticsObject = root.optJSONObject("analytics")
+            val incidentsArray = root.optJSONArray("incidents")
+            LiveResult.Success(
+                LiveApiResponse(
+                    positions = positions,
+                    analytics = analyticsObject?.let(::parseLiveAnalytics),
+                    incidents = (0 until (incidentsArray?.length() ?: 0)).mapNotNull { i ->
+                        incidentsArray?.optJSONObject(i)?.let(::parseLiveIncident)
+                    }
+                )
+            )
+        } catch (e: Exception) {
+            LiveResult.Error(e.message ?: "Parse error")
+        }
+    }
+
+    private fun parseLiveAnalytics(obj: JSONObject): LiveApiAnalytics {
+        val contributionsArray = obj.optJSONArray("strategy_contributions")
+        val summaryObject = obj.optJSONObject("live_summary")
+        val metricsObject = obj.optJSONObject("live_metrics")
+        val integrityObject = obj.optJSONObject("integrity")
+        return LiveApiAnalytics(
+            strategyContributions = (0 until (contributionsArray?.length() ?: 0)).mapNotNull { i ->
+                contributionsArray?.optJSONObject(i)?.let { contribution ->
+                    LiveApiStrategyContribution(
+                        strategyName = contribution.optString("strategy_name", ""),
+                        unrealizedPnl = contribution.optDouble("unrealized_pnl", 0.0),
+                        contributionPct = contribution.optDouble("contribution_pct", 0.0)
+                    )
+                }
+            },
+            liveSummary = summaryObject?.let {
+                LiveApiSummary(
+                    positionCount = it.optInt("position_count", 0),
+                    longCount = it.optInt("long_count", 0),
+                    shortCount = it.optInt("short_count", 0),
+                    longPct = it.optDouble("long_pct", 0.0),
+                    shortPct = it.optDouble("short_pct", 0.0),
+                    totalUnrealizedPnl = it.optDouble("total_unrealized_pnl", 0.0),
+                    totalCapital = it.optDouble("total_capital", 0.0),
+                    avgAgeHours = it.optDouble("avg_age_hours", 0.0)
+                )
+            },
+            liveMetrics = metricsObject?.let {
+                LiveApiMetrics(
+                    largestWinner = parseLivePosition(it.optJSONObject("largest_winner")),
+                    largestLoser = parseLivePosition(it.optJSONObject("largest_loser"))
+                )
+            },
+            integrity = integrityObject?.let {
+                LiveApiIntegrity(
+                    matched = it.optInt("matched", 0),
+                    unclaimed = it.optInt("unclaimed", 0),
+                    missing = it.optInt("missing", 0),
+                    duplicate = it.optInt("duplicate", 0)
+                )
+            }
+        )
+    }
+
+    private fun parseLivePosition(obj: JSONObject?): LiveApiPosition? {
+        if (obj == null) return null
+        return LiveApiPosition(
+            id = obj.optString("id", ""),
+            symbol = obj.optString("symbol", ""),
+            side = obj.optString("side", ""),
+            strategy = obj.optString("strategy", ""),
+            strategyName = obj.optString("strategy_name", ""),
+            opened = obj.optString("opened", ""),
+            entryPrice = obj.optDouble("entry_price", 0.0),
+            currentPrice = obj.optDouble("current_price", 0.0),
+            capital = obj.optDouble("capital", 0.0),
+            quantity = obj.optionalDouble("quantity"),
+            unrealizedPnl = obj.optDouble("unrealized_pnl", 0.0),
+            unrealizedPnlPct = obj.optDouble("unrealized_pnl_pct", 0.0),
+            trendUp = obj.optBoolean("trend_up", false)
+        )
+    }
+
+    private fun parseLiveIncident(obj: JSONObject): LiveApiIncident =
+        LiveApiIncident(
+            timestamp = obj.optString("timestamp", ""),
+            level = obj.optString("level", ""),
+            category = obj.optString("category", ""),
+            title = obj.optString("title", ""),
+            message = obj.optString("message", ""),
+            strategy = obj.optionalString("strategy"),
+            symbol = obj.optionalString("symbol")
+        )
+
     private fun parseEquityCurve(root: JSONObject): List<PortfolioEquityPointApiResponse> {
         val array = root.optJSONArray("equity_curve") ?: return emptyList()
         return (0 until array.length()).mapNotNull { i ->
@@ -544,6 +726,9 @@ object NjordApiClient {
 
     internal fun logsUrl(baseUrl: String): String =
         "$baseUrl/v1/logs?hours=24&limit=5000&exclude_heartbeat=true"
+
+    internal fun liveUrl(baseUrl: String): String =
+        "$baseUrl/v1/live"
 
     internal fun portfolioUrl(baseUrl: String, strategy: String): String =
         "$baseUrl/v1/portfolio?strategy=$strategy"

@@ -32,6 +32,13 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun liveUrl_requestsLiveEndpoint() {
+        val url = NjordApiClient.liveUrl("https://noatun.dev")
+
+        assertEquals("https://noatun.dev/v1/live", url)
+    }
+
+    @Test
     fun parseLogsResponse_wellFormedJson_returnsSuccessWithEntries() {
         val json = makeValidJson(
             makeEntry("INFO", "hyperliquid.wcr", "Rebalance complete", "2026-06-12T14:23:01"),
@@ -206,6 +213,95 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun parseLiveResponse_wellFormedJson_returnsPositionsAnalyticsAndIncidents() {
+        val json = """
+            {
+              "positions": [
+                {
+                  "id": "atom/usdt-long",
+                  "symbol": "ATOM/USDT",
+                  "side": "Long",
+                  "strategy": "big_bang",
+                  "strategy_name": "Big Bang",
+                  "opened": "2d",
+                  "entry_price": 2.0137,
+                  "current_price": 1.9939,
+                  "capital": 343.5574,
+                  "quantity": 170.61,
+                  "unrealized_pnl": -3.3781,
+                  "unrealized_pnl_pct": -0.9832,
+                  "trend_up": false
+                }
+              ],
+              "analytics": {
+                "strategy_contributions": [
+                  {"strategy_name": "Big Bang", "unrealized_pnl": -3.38, "contribution_pct": 0.9668}
+                ],
+                "live_summary": {
+                  "position_count": 1,
+                  "long_count": 1,
+                  "short_count": 0,
+                  "long_pct": 1.0,
+                  "short_pct": 0.0,
+                  "total_unrealized_pnl": -3.38,
+                  "total_capital": 343.56,
+                  "avg_age_hours": 48.0
+                },
+                "live_metrics": {
+                  "largest_winner": null,
+                  "largest_loser": {
+                    "id": "atom/usdt-long",
+                    "symbol": "ATOM/USDT",
+                    "side": "Long",
+                    "strategy": "big_bang",
+                    "strategy_name": "Big Bang",
+                    "opened": "2d",
+                    "entry_price": 2.0137,
+                    "current_price": 1.9939,
+                    "capital": 343.5574,
+                    "quantity": 170.61,
+                    "unrealized_pnl": -3.3781,
+                    "unrealized_pnl_pct": -0.9832,
+                    "trend_up": false
+                  }
+                },
+                "integrity": {"matched": 0, "unclaimed": 1, "missing": 1, "duplicate": 0}
+              },
+              "incidents": [
+                {
+                  "timestamp": "2026-06-14T20:24:02.551205+00:00",
+                  "level": "ERROR",
+                  "category": "safety_abort",
+                  "title": "WCR safety abort: positions remain",
+                  "message": "Positions remain after safety close",
+                  "strategy": "wcr",
+                  "symbol": null
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseLiveResponse(json)
+
+        assertTrue(result is LiveResult.Success)
+        val response = (result as LiveResult.Success).response
+        assertEquals(1, response.positions.size)
+        assertEquals("ATOM/USDT", response.positions[0].symbol)
+        assertEquals(-3.3781, response.positions[0].unrealizedPnl, 0.0001)
+        assertEquals(1, response.analytics?.strategyContributions?.size)
+        assertEquals(1, response.analytics?.liveSummary?.positionCount)
+        assertEquals(1, response.incidents.size)
+        assertEquals("safety_abort", response.incidents[0].category)
+    }
+
+    @Test
+    fun parseLiveResponse_missingPositions_returnsError() {
+        val result = NjordApiClient.parseLiveResponse("""{"analytics":{}}""")
+
+        assertTrue(result is LiveResult.Error)
+    }
+
+    @Test
     fun mapApiHome_formatsSnapshotForHomeCards() {
         val response = HomeApiResponse(
             totalBalance = 18420.0,
@@ -302,6 +398,70 @@ class NjordApiClientTest {
         assertEquals("May", snapshot.monthlyReturns[0].month)
         assertEquals(2, snapshot.equityCurve.size)
         assertEquals("-2.1%", snapshot.drawdownStats[0].value)
+    }
+
+    @Test
+    fun mapApiLive_formatsPositionsAnalyticsAndIncidentsForUi() {
+        val position = LiveApiPosition(
+            id = "atom/usdt-long",
+            symbol = "ATOM/USDT",
+            side = "Long",
+            strategy = "big_bang",
+            strategyName = "Big Bang",
+            opened = "2d",
+            entryPrice = 2.0137,
+            currentPrice = 1.9939,
+            capital = 343.5574,
+            quantity = 170.61,
+            unrealizedPnl = -3.3781,
+            unrealizedPnlPct = -0.9832,
+            trendUp = false
+        )
+        val response = LiveApiResponse(
+            positions = listOf(position),
+            analytics = LiveApiAnalytics(
+                strategyContributions = listOf(LiveApiStrategyContribution("Big Bang", -3.38, 0.9668)),
+                liveSummary = LiveApiSummary(
+                    positionCount = 1,
+                    longCount = 1,
+                    shortCount = 0,
+                    longPct = 1.0,
+                    shortPct = 0.0,
+                    totalUnrealizedPnl = -3.38,
+                    totalCapital = 343.56,
+                    avgAgeHours = 48.0
+                ),
+                liveMetrics = LiveApiMetrics(largestWinner = null, largestLoser = position),
+                integrity = LiveApiIntegrity(matched = 0, unclaimed = 1, missing = 1, duplicate = 0)
+            ),
+            incidents = listOf(
+                LiveApiIncident(
+                    timestamp = "2026-06-14T20:24:02Z",
+                    level = "ERROR",
+                    category = "safety_abort",
+                    title = "WCR safety abort",
+                    message = "Positions remain after safety close",
+                    strategy = "wcr",
+                    symbol = null
+                )
+            )
+        )
+
+        val (positions, analytics, incidents) = mapApiLive(response, now = Instant.parse("2026-06-14T20:29:02Z"))
+
+        assertEquals(1, positions.size)
+        assertEquals("ATOM", positions[0].symbol)
+        assertEquals(StrategyFilter.BigBang, positions[0].strategy)
+        assertEquals("-\$3.38", positions[0].pnl)
+        assertEquals("-1.0%", positions[0].pct)
+        assertEquals("170.61 ATOM", positions[0].size)
+        assertEquals("-\$3.38", analytics?.totalContribution)
+        assertEquals("Big Bang", analytics?.strategyContributions?.single()?.strategy)
+        assertEquals("2d", analytics?.summaryItems?.last()?.value)
+        assertEquals("ATOM", analytics?.largestLoser?.symbol)
+        assertEquals("1", analytics?.integrityItems?.get(1)?.value)
+        assertEquals("WCR", incidents.single().subtitle)
+        assertEquals("5m", incidents.single().age)
     }
 
     @Test

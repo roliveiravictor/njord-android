@@ -33,6 +33,16 @@ class NjordApiCacheTest {
     }
 
     @Test
+    fun fileFor_live_usesDedicatedCacheFileName() {
+        val filesDir = temporaryFolder.newFolder("files")
+        val file = NjordApiCache.fileFor(filesDir, ApiCacheKey.Live)
+
+        assertEquals("live.json", file.name)
+        assertEquals("api-cache", file.parentFile?.name)
+        assertEquals(filesDir, file.parentFile?.parentFile)
+    }
+
+    @Test
     fun delete_removesCachedEndpointFile() {
         val filesDir = temporaryFolder.newFolder("files")
         NjordApiCache.write(filesDir, ApiCacheKey.Logs, """{"entries":[]}""")

@@ -206,4 +206,48 @@ class NjordReducerTest {
         assertTrue(state.heartbeatError)
         assertFalse(state.heartbeatLoading)
     }
+
+    @Test
+    fun liveLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(liveError = true), NjordAction.LiveLoading)
+
+        assertTrue(state.liveLoading)
+        assertFalse(state.liveError)
+    }
+
+    @Test
+    fun liveLoaded_replacesPositionsAnalyticsAndIncidents() {
+        val position = NjordMockData.livePositions.first()
+        val analytics = LiveAnalyticsSnapshot(
+            totalContribution = "+\$1.00",
+            totalContributionTone = Tone.Success,
+            strategyContributions = emptyList(),
+            summaryItems = emptyList(),
+            largestWinner = null,
+            largestLoser = null,
+            integrityItems = emptyList()
+        )
+        val incident = NjordMockData.incidents.first()
+        val state = reduce(
+            NjordUiState(liveLoading = true),
+            NjordAction.LiveLoaded(listOf(position), analytics, listOf(incident))
+        )
+
+        assertEquals(listOf(position), state.livePositions)
+        assertEquals(analytics, state.liveAnalytics)
+        assertEquals(listOf(incident), state.liveIncidents)
+        assertFalse(state.liveLoading)
+        assertFalse(state.liveError)
+    }
+
+    @Test
+    fun liveError_setsErrorTrueAndKeepsCachedLiveData() {
+        val position = NjordMockData.livePositions.first()
+        val initial = NjordUiState(liveLoading = true, livePositions = listOf(position))
+        val state = reduce(initial, NjordAction.LiveError)
+
+        assertEquals(listOf(position), state.livePositions)
+        assertTrue(state.liveError)
+        assertFalse(state.liveLoading)
+    }
 }

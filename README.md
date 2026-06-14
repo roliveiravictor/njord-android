@@ -90,9 +90,10 @@ download Gradle and AndroidX dependencies.
 
 Implemented interactions include bottom navigation, More child navigation, Live
 filters, Portfolio strategy chips, Logs search/severity filters, incident
-dialogs with dismissal, and Live position bottom sheets. The Live screen matches
-the reference operations view with a swipe incident carousel, expanded position
-cards, static open P&L analytics, responsive metric grids, and position integrity
-tiles. The Portfolio screen is a static performance analytics view with a
+dialogs with dismissal, and Live position bottom sheets. The Live screen fetches
+`/v1/live` with the same cache-first refresh flow as the other remote-backed
+screens, including open positions, live incidents, strategy contribution,
+summary metrics, largest winner/loser, and position integrity panels. The
+Portfolio screen is a static performance analytics view with a
 reference-matched hero, live metrics, monthly stats, and performance history
 charts.
