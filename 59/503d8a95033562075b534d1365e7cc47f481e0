@@ -1,0 +1,93 @@
+app/src/main/java/com/njord/mobile/api/ActivityMapper.kt
+  s_cc33be8c408bf1::t_8cfc283c58c26d 8,10-12,16-21
+app/src/main/java/com/njord/mobile/model/NjordMockData.kt
+  s_44682d6616fa17::t_d0a415b58591b6 88-92
+app/src/main/java/com/njord/mobile/api/LogEntryMapper.kt
+  s_712737acc14d32::t_ef0e429605ffa1 14,17-20,22,24
+  s_712737acc14d32::t_4728ab7b431d22 15-16,21,23,25-26,33-34,37-44,53
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_712737acc14d32::t_5e8441b5759ec5 863
+  s_712737acc14d32::t_05fe33edff7ff4 69-95,853-862,864-870
+  s_cc33be8c408bf1::t_5b0dbf9507f3b2 29-34,530,571-572,574-576,580,620
+  s_0d72005d24a7b4::t_dfe6e0f6e08844 521
+  s_0d72005d24a7b4::t_d112ac91ccb450 519-520,522
+  s_712737acc14d32::t_826cc36498dcf1 96-118
+  s_f4e20409c8a969::t_e0432401561517 698-721
+  s_44682d6616fa17::t_d0a415b58591b6 917,921
+  s_f4e20409c8a969::t_1246b823dab5f2 4
+app/src/main/java/com/njord/mobile/api/HunchReportMapper.kt
+  s_f4e20409c8a969::t_8f65836b577807 17,30-31
+app/src/main/java/com/njord/mobile/api/LiveMapper.kt
+  s_0d72005d24a7b4::t_41a9c194b7a893 53-55,71-74
+  s_0d72005d24a7b4::t_74f68013054e74 52,70
+app/src/main/java/com/njord/mobile/api/HeartbeatMapper.kt
+  s_44682d6616fa17::t_d0a415b58591b6 11-13,32,41-48
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_712737acc14d32::t_c0f361823a9824 12-16,657-659,661
+  s_712737acc14d32::t_d45c3b219f8222 651,655-656,660,662
+  s_1535d54934e5b5::t_fc75c0416828bd 731-732
+  s_712737acc14d32::t_27f7c18b4122f3 754-756
+  s_cc33be8c408bf1::t_f74fe1f30556b9 334,741-742
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_712737acc14d32::t_5d8da69efeab9c 2140-2143
+  s_1535d54934e5b5::t_fc75c0416828bd 2767-2768
+  s_0d72005d24a7b4::t_caf7ed391375d3 1872
+app/src/androidTest/java/com/njord/mobile/NjordAppTest.kt
+  s_44682d6616fa17::t_d0a415b58591b6 156,158-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "59503d8a95033562075b534d1365e7cc47f481e0",
+  "prompts": {},
+  "sessions": {
+    "s_0d72005d24a7b4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecb01-0d92-79c2-90a1-cd0ff1dccf4e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_1535d54934e5b5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecafe-1b77-7681-85b7-9ee9b98f8f88",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_44682d6616fa17": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecb06-6ce1-7730-a57f-3b86605ff03a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_712737acc14d32": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec8f6-ac35-7fa0-aee2-d04772a182ce",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_cc33be8c408bf1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec919-0070-7fa0-97a7-bb1268fbf319",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_f4e20409c8a969": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecb05-80b1-7db3-af8e-d180c9157685",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
