@@ -65,16 +65,15 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             MiniKpi("LONG", (summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) }).toString(), "${formatPercent(summary?.longPct ?: ratio(positions.count { it.side.equals("Long", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("SHORT", (summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) }).toString(), "${formatPercent(summary?.shortPct ?: ratio(positions.count { it.side.equals("Short", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("OPEN P&L", formatSignedCurrency(totalPnl), "All strategies", toneFor(totalPnl)),
-            MiniKpi("CAPITAL", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Displayed filter", Tone.Muted),
+            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Displayed filter", Tone.Muted),
             MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted)
         ),
         largestWinner = analytics.liveMetrics?.largestWinner?.let(::mapLiveOutcome),
         largestLoser = analytics.liveMetrics?.largestLoser?.let(::mapLiveOutcome),
         integrityItems = listOf(
-            MiniKpi("MATCHED", (analytics.integrity?.matched ?: 0).toString(), "Local + exchange", Tone.Success),
-            MiniKpi("UNCLAIMED", (analytics.integrity?.unclaimed ?: 0).toString(), "Exchange only", integrityTone(analytics.integrity?.unclaimed ?: 0)),
-            MiniKpi("MISSING", (analytics.integrity?.missing ?: 0).toString(), "Local only", integrityTone(analytics.integrity?.missing ?: 0)),
-            MiniKpi("DUPLICATE", (analytics.integrity?.duplicate ?: 0).toString(), "Multi-owner", integrityTone(analytics.integrity?.duplicate ?: 0))
+            MiniKpi("Matched", (analytics.integrity?.matched ?: 0).toString(), "", Tone.Success),
+            MiniKpi("Exchange", (analytics.integrity?.unclaimed ?: 0).toString(), "", integrityTone(analytics.integrity?.unclaimed ?: 0)),
+            MiniKpi("Local", (analytics.integrity?.missing ?: 0).toString(), "", integrityTone(analytics.integrity?.missing ?: 0))
         )
     )
 }

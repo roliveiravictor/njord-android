@@ -43,6 +43,7 @@ android {
             buildConfigField("String", "NJORD_API_BASE_URL", debugApiBaseUrl.get().asBuildConfigString())
         }
         release {
+            signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "NJORD_API_BASE_URL", releaseApiBaseUrl.get().asBuildConfigString())
         }
     }

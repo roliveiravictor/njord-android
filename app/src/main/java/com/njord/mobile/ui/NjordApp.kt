@@ -562,16 +562,17 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
+        if (state.liveError) {
+            ApiErrorCard("Remote live data unavailable. Showing the last cached live snapshot.")
+        }
+        LiveAnalyticsSections(state.liveAnalytics)
         LiveFilterBar(
             strategyFilter = state.liveStrategyFilter,
             sideFilter = state.liveSideFilter,
             onStrategySelect = { onAction(NjordAction.SetLiveStrategyFilter(it)) },
             onSideSelect = { onAction(NjordAction.SetLiveSideFilter(it)) }
         )
-        LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
-        if (state.liveError) {
-            ApiErrorCard("Remote live data unavailable. Showing the last cached live snapshot.")
-        }
         if (positions.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLivePositions")) {
                 Text("No open positions match this filter.", color = TextMuted, fontSize = 13.sp)
@@ -581,7 +582,6 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 LivePositionCard(position) { onAction(NjordAction.SelectPosition(position)) }
             }
         }
-        LiveAnalyticsSections(state.liveAnalytics)
     }
 }
 
@@ -1737,8 +1737,6 @@ private fun LivePositionCard(position: LivePosition, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.Top) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CoinIcon(position.symbol, tone)
-                Spacer(Modifier.height(7.dp))
-                Badge(side, if (side == "Short") Tone.Danger else Tone.Success)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -1759,19 +1757,13 @@ private fun LivePositionCard(position: LivePosition, onClick: () -> Unit) {
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(position.pnl, color = toneColor(tone), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Badge(side, if (side == "Short") Tone.Danger else Tone.Success)
+                    Spacer(Modifier.width(8.dp))
+                    Text(position.pnl, color = toneColor(tone), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+                }
                 Text(position.pct, color = toneColor(tone), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LiveValueTile("SIZE", position.size.substringBefore(" "), Modifier.weight(1f))
-            LiveValueTile("CAPITAL", position.capital, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            LiveFooterValue("ENTRY", position.entry, Modifier.weight(1f))
-            LiveFooterValue("CURRENT", position.current, Modifier.weight(1f), tone)
         }
     }
 }
@@ -1831,6 +1823,9 @@ private fun LiveFooterValue(label: String, value: String, modifier: Modifier = M
 private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
     if (analytics == null) return
 
+    SectionTitle("Live summary")
+    LiveMetricPanel(items = analytics.summaryItems)
+
     SectionTitle("Open P&L by strategy")
     NjordCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -1851,9 +1846,6 @@ private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
             }
         }
     }
-
-    SectionTitle("Live summary")
-    LiveMetricPanel(items = analytics.summaryItems)
 
     SectionTitle("Live metrics")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1880,10 +1872,10 @@ private fun LiveMetricPanel(items: List<MiniKpi>) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items.chunked(3).forEach { rowItems ->
+        items.chunked(3).forEachIndexed { rowIndex, rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowItems.forEach { item ->
-                    LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f))
+                    LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f), compact = rowIndex > 0)
                 }
                 repeat(3 - rowItems.size) {
                     Spacer(Modifier.weight(1f))
@@ -1941,7 +1933,7 @@ private fun LiveContributionRow(strategy: String, progress: Float, value: String
 }
 
 @Composable
-private fun LiveMetricTile(label: String, value: String, subtext: String, tone: Tone, modifier: Modifier = Modifier) {
+private fun LiveMetricTile(label: String, value: String, subtext: String, tone: Tone, modifier: Modifier = Modifier, compact: Boolean = false) {
     val isPositive = value.startsWith("+")
     val valueColor = when {
         isPositive -> Success
@@ -1967,7 +1959,7 @@ private fun LiveMetricTile(label: String, value: String, subtext: String, tone: 
     ) {
         Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(9.dp))
-        Text(value, color = valueColor, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = valueColor, fontSize = if (compact) 18.sp else 24.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(4.dp))
         Text(subtext, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -1993,11 +1985,11 @@ private fun LiveOutcomeTile(
     ) {
         Text(label, color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(6.dp))
-        Text(symbol, color = toneColor(tone), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(symbol, color = toneColor(tone), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(amount, color = toneColor(tone), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            Text(" · $percent", color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(amount, color = toneColor(tone), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Text(" · $percent", color = TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -2014,10 +2006,12 @@ private fun LiveIntegrityTile(label: String, value: String, subtext: String, ton
             .padding(horizontal = 4.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, color = TextMuted, fontSize = 7.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(7.dp))
         Text(value, color = toneColor(tone), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-        Text(subtext, color = TextMuted, fontSize = 8.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (subtext.isNotBlank()) {
+            Text(subtext, color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -2200,21 +2194,6 @@ private fun LogRow(log: LogEntry, expanded: Boolean, onClick: () -> Unit) {
                     fontSize = 12.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
-                )
-            }
-            Button(
-                onClick = onClick,
-                modifier = Modifier.testTag("logRowToggle"),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryContainer,
-                    contentColor = Primary
-                ),
-                shape = RoundedCornerShape(999.dp)
-            ) {
-                Text(
-                    if (expanded) "Hide message" else "Show full message",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
@@ -2730,12 +2709,11 @@ private fun Badge(label: String, tone: Tone) {
 @Composable
 private fun CoinIcon(text: String, tone: Tone) {
     val symbol = text.uppercase()
-    val sources = CoinLogoSourcesBySymbol[symbol]
     val context = LocalContext.current.applicationContext
     var logo by remember(symbol) { mutableStateOf<ImageBitmap?>(null) }
 
-    LaunchedEffect(symbol, sources) {
-        logo = sources?.let { loadCoinLogo(context, symbol, it) }
+    LaunchedEffect(symbol) {
+        logo = loadCoinLogo(context, symbol)
     }
 
     Box(
@@ -2758,21 +2736,25 @@ private fun CoinIcon(text: String, tone: Tone) {
     }
 }
 
-private suspend fun loadCoinLogo(context: Context, symbol: String, sources: CoinLogoSources): ImageBitmap? =
+private suspend fun loadCoinLogo(context: Context, symbol: String): ImageBitmap? =
     withContext(Dispatchers.IO) {
         CoinLogoCache.read(context.cacheDir, symbol)?.let { cachedBytes ->
             decodeLogoBytes(cachedBytes)?.let { return@withContext it }
             CoinLogoCache.delete(context.cacheDir, symbol)
         }
 
-        listOf(sources.primaryUrl, sources.fallbackUrl).firstNotNullOfOrNull { url ->
-            runCatching {
-                val bytes = loadRemoteBitmapBytes(url) ?: return@runCatching null
-                decodeLogoBytes(bytes)?.also {
-                    CoinLogoCache.write(context.cacheDir, symbol, bytes)
-                }
-            }.getOrNull()
-        } ?: findCoinGeckoLogoUrl(symbol)?.let { url ->
+        CoinLogoSourcesBySymbol[symbol]?.let { sources ->
+            listOf(sources.primaryUrl, sources.fallbackUrl).firstNotNullOfOrNull { url ->
+                runCatching {
+                    val bytes = loadRemoteBitmapBytes(url) ?: return@runCatching null
+                    decodeLogoBytes(bytes)?.also {
+                        CoinLogoCache.write(context.cacheDir, symbol, bytes)
+                    }
+                }.getOrNull()
+            }?.let { return@withContext it }
+        }
+
+        findCoinGeckoLogoUrl(symbol)?.let { url ->
             runCatching {
                 val bytes = loadRemoteBitmapBytes(url) ?: return@runCatching null
                 decodeLogoBytes(bytes)?.also {
