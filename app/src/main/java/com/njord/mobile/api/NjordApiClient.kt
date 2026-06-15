@@ -294,8 +294,8 @@ object NjordApiClient {
         }
     }
 
-    fun fetchLive(baseUrl: String, apiKey: String): LiveResult {
-        return when (val payload = fetchLivePayload(baseUrl, apiKey)) {
+    fun fetchLive(baseUrl: String, apiKey: String, strategy: String = "all"): LiveResult {
+        return when (val payload = fetchLivePayload(baseUrl, apiKey, strategy)) {
             is ApiPayloadResult.Success -> parseLiveResponse(payload.body)
             is ApiPayloadResult.Error -> LiveResult.Error(payload.message)
         }
@@ -335,8 +335,8 @@ object NjordApiClient {
     fun fetchActivityPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload(activityUrl(baseUrl), apiKey, "fetchActivity")
 
-    fun fetchLivePayload(baseUrl: String, apiKey: String): ApiPayloadResult =
-        fetchPayload(liveUrl(baseUrl), apiKey, "fetchLive")
+    fun fetchLivePayload(baseUrl: String, apiKey: String, strategy: String = "all"): ApiPayloadResult =
+        fetchPayload(liveUrl(baseUrl, strategy), apiKey, "fetchLive")
 
     fun fetchPortfolioPayload(baseUrl: String, apiKey: String, strategy: String): ApiPayloadResult =
         fetchPayload(portfolioUrl(baseUrl, strategy), apiKey, "fetchPortfolio")
@@ -759,8 +759,8 @@ object NjordApiClient {
     internal fun activityUrl(baseUrl: String): String =
         "$baseUrl/v1/activity?limit=1"
 
-    internal fun liveUrl(baseUrl: String): String =
-        "$baseUrl/v1/live"
+    internal fun liveUrl(baseUrl: String, strategy: String = "all"): String =
+        if (strategy == "all") "$baseUrl/v1/live" else "$baseUrl/v1/live?strategy=$strategy"
 
     internal fun portfolioUrl(baseUrl: String, strategy: String): String =
         "$baseUrl/v1/portfolio?strategy=$strategy"

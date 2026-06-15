@@ -40,10 +40,17 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun liveUrl_requestsLiveEndpoint() {
+    fun liveUrl_requestsLiveEndpointWithNoStrategyParam() {
         val url = NjordApiClient.liveUrl("https://noatun.dev")
 
         assertEquals("https://noatun.dev/v1/live", url)
+    }
+
+    @Test
+    fun liveUrl_appendsStrategyParamWhenNotAll() {
+        val url = NjordApiClient.liveUrl("https://noatun.dev", "big_bang")
+
+        assertEquals("https://noatun.dev/v1/live?strategy=big_bang", url)
     }
 
     @Test
@@ -549,10 +556,11 @@ class NjordApiClientTest {
         assertEquals("170.61 ATOM", positions[0].size)
         assertEquals("-\$3.38", analytics?.totalContribution)
         assertEquals("Big Bang", analytics?.strategyContributions?.single()?.strategy)
+        assertEquals("Leveraged capital", analytics?.summaryItems?.first()?.subtext)
         assertEquals("2d", analytics?.summaryItems?.get(1)?.value)
-        assertEquals("INTEGRITY", analytics?.summaryItems?.last()?.label)
-        assertEquals("1/1", analytics?.summaryItems?.last()?.value)
-        assertEquals("Cache vs. CEX", analytics?.summaryItems?.last()?.subtext)
+        assertEquals("INTEGRITY", analytics?.summaryItems?.get(2)?.label)
+        assertEquals("1/1", analytics?.summaryItems?.get(2)?.value)
+        assertEquals("Cache vs. CEX", analytics?.summaryItems?.get(2)?.subtext)
         assertEquals("ATOM", analytics?.largestLoser?.symbol)
         assertEquals("1", analytics?.integrityItems?.get(1)?.value)
         assertEquals("WCR", incidents.single().subtitle)
@@ -884,7 +892,7 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun mapApiEntries_causeStrategy_setsCardTitleAndFilterStrategy() {
+    fun mapApiEntries_causeStrategy_setsFilterStrategyAndPreservesEntryTitle() {
         val entries = listOf(
             LogApiEntry(
                 level = "INFO",
@@ -900,7 +908,7 @@ class NjordApiClientTest {
         val log = mapApiEntries(entries).single()
 
         assertEquals(StrategyFilter.BigBang, log.strategy)
-        assertEquals("Big Bang", log.title)
+        assertEquals("session.snapshot", log.title)
     }
 
     private fun makeApiEntry(level: String, title: String, message: String, timestamp: String) =

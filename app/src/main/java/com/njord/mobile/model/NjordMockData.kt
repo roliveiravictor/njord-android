@@ -77,13 +77,6 @@ object NjordMockData {
         LivePosition("arb-short", "ARB", "Short", StrategyFilter.Wcr, "WCR", "22h", "-$31", "-2.2%", "1,050 ARB", "$1.1k", "$1.02", "$1.04", false)
     )
 
-    val riskChecks = listOf(
-        RiskCheck("Margin usage elevated", "Used margin is 40% of available capacity", "Medium", Tone.Warning),
-        RiskCheck("SOL near trailing stop", "Distance to threshold: 1.4%", "Watch", Tone.Warning),
-        RiskCheck("No orphan positions", "Exchange and local ownership match", "OK", Tone.Success),
-        RiskCheck("Basket divergence contained", "WCR long / short exposure remains balanced", "OK", Tone.Success)
-    )
-
     val heartbeatRoutines = listOf(
         HeartbeatRoutine("VPN", "Healthy", "2m ago", "20m", Tone.Success),
         HeartbeatRoutine("Strategy", "Healthy", "3m ago", "20m", Tone.Success),

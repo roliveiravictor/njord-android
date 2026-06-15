@@ -225,7 +225,10 @@ class NjordReducerTest {
             summaryItems = emptyList(),
             largestWinner = null,
             largestLoser = null,
-            integrityItems = emptyList()
+            integrityItems = emptyList(),
+            longCount = 0,
+            shortCount = 0,
+            longPct = 0f
         )
         val incident = NjordMockData.incidents.first()
         val state = reduce(

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -132,14 +133,12 @@ import com.njord.mobile.model.ActivitySummary
 import com.njord.mobile.model.ChartPoint
 import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.HunchReport
-import com.njord.mobile.model.NjordMockData
 import com.njord.mobile.model.NjordUiState
 import com.njord.mobile.model.PortfolioMetric
 import com.njord.mobile.model.PortfolioMonthReturn
 import com.njord.mobile.model.PortfolioPosition
 import com.njord.mobile.model.PortfolioSnapshot
 import com.njord.mobile.model.ReportFactor
-import com.njord.mobile.model.RiskCheck
 import com.njord.mobile.model.SideFilter
 import com.njord.mobile.model.StrategyCycle
 import com.njord.mobile.model.StrategyFilter
@@ -255,8 +254,38 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val listState = rememberLazyListState()
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     LaunchedEffect(state.destination) {
         listState.scrollToItem(0)
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            scope.launch(Dispatchers.IO) { loadHomeData(context, onAction) }
+            scope.launch(Dispatchers.IO) {
+                loadLiveData(context, onAction, liveApiStrategy(state.liveStrategyFilter), liveCacheKey(state.liveStrategyFilter))
+            }
+        }
+    }
+
+    LaunchedEffect(state.liveStrategyFilter) {
+        scope.launch(Dispatchers.IO) {
+            loadLiveData(context, onAction, liveApiStrategy(state.liveStrategyFilter), liveCacheKey(state.liveStrategyFilter))
+        }
+    }
+
+    LaunchedEffect(state.destination, state.portfolioStrategyFilter) {
+        val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
+        val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
+        when (state.destination) {
+            Destination.Portfolio -> scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
+            Destination.Activity -> scope.launch(Dispatchers.IO) { loadActivityData(context, onAction) }
+            Destination.Heartbeat -> scope.launch(Dispatchers.IO) { loadHeartbeatData(context, onAction) }
+            Destination.Logs -> scope.launch(Dispatchers.IO) { loadLogsData(context, onAction) }
+            Destination.Reports -> scope.launch(Dispatchers.IO) { loadHunchReportData(context, onAction) }
+            else -> {}
+        }
     }
 
     Scaffold(
@@ -296,7 +325,6 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 Destination.Home -> item { HomeScreen(state, onAction) }
                 Destination.Portfolio -> item { PortfolioScreen(state, onAction) }
                 Destination.Live -> item { LiveScreen(state, onAction) }
-                Destination.Risk -> item { RiskScreen() }
                 Destination.More -> item { MoreScreen(onAction) }
                 Destination.Activity -> item { ActivityScreen(state, onAction) }
                 Destination.Heartbeat -> item { HeartbeatScreen(state, onAction) }
@@ -349,7 +377,6 @@ private suspend fun dispatchUiAction(onAction: (NjordAction) -> Unit, action: Nj
 }
 
 private suspend fun showApiFailureToast(context: Context, error: ApiPayloadResult.Error) {
-    if (!com.njord.mobile.BuildConfig.DEBUG) return
     val status = error.statusCode?.toString() ?: "network"
     val msg = error.message.take(160)
     withContext(Dispatchers.Main) {
@@ -361,56 +388,244 @@ private suspend fun showApiParseFailureToast(context: Context, payload: ApiPaylo
     showApiFailureToast(context, ApiPayloadResult.Error(payload.statusCode, payload.path, message))
 }
 
-@Composable
-private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseHomeResponse(cachedBody)) {
-                        is HomeResult.Success -> {
-                            // Strip incidents from cached snapshot — incidents.json is the authoritative source
-                            val snapshot = mapApiHome(cached.response).copy(incidents = emptyList())
-                            dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
-                        }
-                        is HomeResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Home)
-                        else -> {}
-                    }
-                }
-
-                when (val result = NjordApiClient.fetchHomePayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseHomeResponse(result.body)) {
-                            is HomeResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.Home, result.body)
-                                val snapshot = mapApiHome(parsed.response)
-                                if (snapshot.incidents.isNotEmpty()) {
-                                    val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
-                                    val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
-                                    NjordApiCache.write(
-                                        context.filesDir,
-                                        ApiCacheKey.Incidents,
-                                        NjordApiClient.mergeIncidentJson(existingJson, incomingJson)
-                                    )
-                                }
-                                dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
-                            }
-                            is HomeResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
+private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Unit) {
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseHomeResponse(cachedBody)) {
+            is HomeResult.Success -> {
+                val snapshot = mapApiHome(cached.response).copy(incidents = emptyList())
+                dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
             }
+            is HomeResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Home)
+            else -> {}
         }
     }
+    when (val result = NjordApiClient.fetchHomePayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseHomeResponse(result.body)) {
+                is HomeResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.Home, result.body)
+                    val snapshot = mapApiHome(parsed.response)
+                    if (snapshot.incidents.isNotEmpty()) {
+                        val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
+                        val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
+                        NjordApiCache.write(
+                            context.filesDir,
+                            ApiCacheKey.Incidents,
+                            NjordApiClient.mergeIncidentJson(existingJson, incomingJson)
+                        )
+                    }
+                    dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
+                }
+                is HomeResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
 
+private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Unit, strategy: String = "all", cacheKey: ApiCacheKey = ApiCacheKey.Live) {
+    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseLiveResponse(cachedBody)) {
+            is LiveResult.Success -> {
+                val (cachedPositions, cachedAnalytics, _) = mapApiLive(cached.response)
+                dispatchUiAction(onAction, NjordAction.LiveLoaded(cachedPositions, cachedAnalytics, emptyList()))
+            }
+            is LiveResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchLivePayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY,
+        strategy
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseLiveResponse(result.body)) {
+                is LiveResult.Success -> {
+                    NjordApiCache.write(context.filesDir, cacheKey, result.body)
+                    val (livePositions, liveAnalytics, liveIncidents) = mapApiLive(parsed.response)
+                    if (liveIncidents.isNotEmpty()) {
+                        val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
+                        val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
+                        NjordApiCache.write(
+                            context.filesDir,
+                            ApiCacheKey.Incidents,
+                            NjordApiClient.mergeIncidentJson(existingJson, incomingJson)
+                        )
+                    }
+                    dispatchUiAction(onAction, NjordAction.LiveLoaded(livePositions, liveAnalytics, liveIncidents))
+                }
+                is LiveResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+private suspend fun loadPortfolioData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
+    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parsePortfolioResponse(cachedBody)) {
+            is PortfolioResult.Success -> dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
+            is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchPortfolioPayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY,
+        strategy
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parsePortfolioResponse(result.body)) {
+                is PortfolioResult.Success -> {
+                    NjordApiCache.write(context.filesDir, cacheKey, result.body)
+                    dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(parsed.response)))
+                }
+                is PortfolioResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+private suspend fun loadActivityData(context: Context, onAction: (NjordAction) -> Unit) {
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseActivityResponse(cachedBody)) {
+            is ActivityResult.Success -> {
+                val (summary, cycles) = mapApiActivity(cached.response)
+                dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
+            }
+            is ActivityResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Activity)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchActivityPayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseActivityResponse(result.body)) {
+                is ActivityResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.Activity, result.body)
+                    val (summary, cycles) = mapApiActivity(parsed.response)
+                    dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
+                }
+                is ActivityResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) -> Unit) {
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseHeartbeatResponse(cachedBody)) {
+            is HeartbeatResult.Success -> {
+                val snapshot = mapApiHeartbeat(cached)
+                dispatchUiAction(
+                    onAction,
+                    NjordAction.HeartbeatLoaded(
+                        routines = snapshot.routines,
+                        healthyCount = snapshot.healthyCount,
+                        lateCount = snapshot.lateCount,
+                        criticalCount = snapshot.criticalCount,
+                        totalCount = snapshot.totalCount
+                    )
+                )
+            }
+            is HeartbeatResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Heartbeat)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchHeartbeatPayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseHeartbeatResponse(result.body)) {
+                is HeartbeatResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.Heartbeat, result.body)
+                    val snapshot = mapApiHeartbeat(parsed)
+                    dispatchUiAction(
+                        onAction,
+                        NjordAction.HeartbeatLoaded(
+                            routines = snapshot.routines,
+                            healthyCount = snapshot.healthyCount,
+                            lateCount = snapshot.lateCount,
+                            criticalCount = snapshot.criticalCount,
+                            totalCount = snapshot.totalCount
+                        )
+                    )
+                }
+                is HeartbeatResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Unit) {
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseLogsResponse(cachedBody)) {
+            is LogsResult.Success -> dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
+            is LogsResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchLogsPayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseLogsResponse(result.body)) {
+                is LogsResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.Logs, result.body)
+                    dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(parsed.entries)))
+                }
+                is LogsResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+private suspend fun loadHunchReportData(context: Context, onAction: (NjordAction) -> Unit) {
+    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+        when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
+            is HunchReportResult.Success -> dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
+            is HunchReportResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
+            else -> {}
+        }
+    }
+    when (val result = NjordApiClient.fetchHunchReportPayload(
+        com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
+        com.njord.mobile.BuildConfig.NJORD_API_KEY
+    )) {
+        is ApiPayloadResult.Success -> {
+            when (val parsed = NjordApiClient.parseHunchReportResponse(result.body)) {
+                is HunchReportResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReport, result.body)
+                    dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(parsed.report)))
+                }
+                is HunchReportResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                else -> {}
+            }
+        }
+        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+    }
+}
+
+@Composable
+private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val snapshot = state.homeSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -443,73 +658,39 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun PortfolioScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
-    val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner, strategy) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parsePortfolioResponse(cachedBody)) {
-                        is PortfolioResult.Success -> dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
-                        is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
-                        else -> {}
-                    }
-                }
-
-                dispatchUiAction(onAction, NjordAction.PortfolioLoading)
-                when (val result = NjordApiClient.fetchPortfolioPayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY,
-                    strategy
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parsePortfolioResponse(result.body)) {
-                            is PortfolioResult.Success -> {
-                                NjordApiCache.write(context.filesDir, cacheKey, result.body)
-                                dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(parsed.response)))
-                            }
-                            is PortfolioResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
-    }
-
-    val snapshot = state.portfolioSnapshot ?: fallbackPortfolioSnapshot()
+    val snapshot = state.portfolioSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        PortfolioPerformanceHero(snapshot)
         FilterRow(
             items = StrategyFilter.entries,
             selected = state.portfolioStrategyFilter,
             label = { it.label },
             onSelect = { onAction(NjordAction.SetPortfolioStrategyFilter(it)) }
         )
-        SectionTitle("Live metrics")
-        PortfolioMetricGrid(snapshot.liveMetrics)
-        SectionTitle("Monthly stats")
-        PortfolioMonthlyStats(snapshot.monthlyStats)
-        SectionTitle("Performance history")
-        PortfolioHistoryCard(
-            title = "Portfolio P&L over time",
-            trailing = "30D trend",
-            stats = snapshot.equityStats
-        ) {
-            ChartCanvas(
-                positive = true,
-                showFill = true,
-                axisLabels = snapshot.equityAxisLabels,
-                points = snapshot.equityCurve
-            )
+        if (snapshot == null) {
+            NjordCard { Text("No portfolio data available yet.", color = TextMuted, fontSize = 13.sp) }
+        } else {
+            PortfolioPerformanceHero(snapshot)
+            SectionTitle("Live metrics")
+            PortfolioMetricGrid(snapshot.liveMetrics)
+            SectionTitle("Monthly stats")
+            PortfolioMonthlyStats(snapshot.monthlyStats)
+            SectionTitle("Performance history")
+            PortfolioHistoryCard(
+                title = "Portfolio P&L over time",
+                trailing = "30D trend",
+                stats = snapshot.equityStats
+            ) {
+                ChartCanvas(
+                    positive = true,
+                    showFill = true,
+                    axisLabels = snapshot.equityAxisLabels,
+                    points = snapshot.equityCurve
+                )
+            }
+            DrawdownHistoryCard(snapshot)
+            ReturnByMonthCard(snapshot)
         }
-        DrawdownHistoryCard(snapshot)
-        ReturnByMonthCard(snapshot)
     }
 }
 
@@ -529,124 +710,44 @@ private fun portfolioCacheKey(filter: StrategyFilter): ApiCacheKey =
         StrategyFilter.Hunch -> ApiCacheKey.PortfolioHunch
     }
 
-private fun fallbackPortfolioSnapshot(): PortfolioSnapshot =
-    PortfolioSnapshot(
-        totalEquity = "$18.4k",
-        returnBadge = "ALL +127.4%",
-        returnTone = Tone.Info,
-        todayPnl = "+$96",
-        todayPct = "+0.5%",
-        todayTone = Tone.Success,
-        sevenDayPnl = "+$812",
-        sevenDayPct = "+4.6%",
-        sevenDayTone = Tone.Success,
-        thirtyDayPnl = "+$2.4k",
-        thirtyDayPct = "+14.8%",
-        thirtyDayTone = Tone.Success,
-        liveMetrics = listOf(
-            PortfolioMetric("REALIZED P&L", "+$1.9k", Tone.Success, "Closed positions"),
-            PortfolioMetric("UNREALIZED P&L", "+$428", Tone.Success, "Open positions"),
-            PortfolioMetric("WIN RATE", "56%", Tone.Muted, "124 closed trades"),
-            PortfolioMetric("PROFIT FACTOR", "1.42", Tone.Muted, "Gross profit / loss")
-        ),
-        monthlyStats = listOf(
-            PortfolioMetric("BEST MONTH", "+6.2%", Tone.Success, "April"),
-            PortfolioMetric("WORST MONTH", "-1.1%", Tone.Danger, "March"),
-            PortfolioMetric("AVERAGE", "+2.8%", Tone.Success, "Last 6 months")
-        ),
-        equityStats = listOf(
-            PortfolioMetric("Current", "$18.4k"),
-            PortfolioMetric("High", "$19.1k"),
-            PortfolioMetric("30D P&L", "+$2.4k", Tone.Success)
-        ),
-        equityCurve = NjordMockData.equityCurve,
-        equityAxisLabels = listOf("May 10", "May 20", "May 30", "Today"),
-        drawdownStats = listOf(
-            PortfolioMetric("Current", "-2.1%", Tone.Warning),
-            PortfolioMetric("Max", "-6.4%", Tone.Danger),
-            PortfolioMetric("Recovery", "63%")
-        ),
-        drawdownCurve = NjordMockData.drawdownCurve,
-        drawdownAxisLabels = listOf("0%", "-3%", "-6%", "Recovery"),
-        monthlyReturns = listOf(
-            PortfolioMonthReturn("Jan", "+4.1%", 0.66f, Tone.Success),
-            PortfolioMonthReturn("Feb", "+2.3%", 0.48f, Tone.Success),
-            PortfolioMonthReturn("Mar", "-1.1%", 0.24f, Tone.Danger),
-            PortfolioMonthReturn("Apr", "+6.2%", 0.88f, Tone.Success),
-            PortfolioMonthReturn("May", "+3.8%", 0.62f, Tone.Success),
-            PortfolioMonthReturn("Jun", "+1.4%", 0.38f, Tone.Success)
-        )
-    )
+private fun liveApiStrategy(filter: StrategyFilter): String =
+    when (filter) {
+        StrategyFilter.All -> "all"
+        StrategyFilter.BigBang -> "big_bang"
+        StrategyFilter.Wcr -> "wcr"
+        StrategyFilter.Hunch -> "hunch"
+    }
+
+private fun liveCacheKey(filter: StrategyFilter): ApiCacheKey =
+    when (filter) {
+        StrategyFilter.All -> ApiCacheKey.Live
+        StrategyFilter.BigBang -> ApiCacheKey.LiveBigBang
+        StrategyFilter.Wcr -> ApiCacheKey.LiveWcr
+        StrategyFilter.Hunch -> ApiCacheKey.LiveHunch
+    }
+
 
 @Composable
 private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
     val positions = visibleLivePositions(
         state.livePositions,
-        state.liveStrategyFilter,
+        StrategyFilter.All,
         state.liveSideFilter
     )
     val incidents = state.liveIncidents
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.Live)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseLiveResponse(cachedBody)) {
-                        is LiveResult.Success -> {
-                            // Strip incidents from cache — incidents.json is the authoritative source
-                            val (cachedPositions, cachedAnalytics, _) = mapApiLive(cached.response)
-                            dispatchUiAction(onAction, NjordAction.LiveLoaded(cachedPositions, cachedAnalytics, emptyList()))
-                        }
-                        is LiveResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Live)
-                        else -> {}
-                    }
-                }
-
-                dispatchUiAction(onAction, NjordAction.LiveLoading)
-                when (val result = NjordApiClient.fetchLivePayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseLiveResponse(result.body)) {
-                            is LiveResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.Live, result.body)
-                                val (livePositions, liveAnalytics, liveIncidents) = mapApiLive(parsed.response)
-                                if (liveIncidents.isNotEmpty()) {
-                                    val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
-                                    val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
-                                    NjordApiCache.write(
-                                        context.filesDir,
-                                        ApiCacheKey.Incidents,
-                                        NjordApiClient.mergeIncidentJson(existingJson, incomingJson)
-                                    )
-                                }
-                                dispatchUiAction(onAction, NjordAction.LiveLoaded(livePositions, liveAnalytics, liveIncidents))
-                            }
-                            is LiveResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
-    }
 
     Column(
         Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
-        LiveAnalyticsSections(state.liveAnalytics)
         LiveFilterBar(
             strategyFilter = state.liveStrategyFilter,
             sideFilter = state.liveSideFilter,
             onStrategySelect = { onAction(NjordAction.SetLiveStrategyFilter(it)) },
             onSideSelect = { onAction(NjordAction.SetLiveSideFilter(it)) }
         )
+        LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
+        LiveAnalyticsSections(state.liveAnalytics)
         if (positions.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLivePositions")) {
                 Text("No open positions match this filter.", color = TextMuted, fontSize = 13.sp)
@@ -659,18 +760,6 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     }
 }
 
-@Composable
-private fun RiskScreen() {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HeroCard(
-            label = "Risk state",
-            title = "Guarded",
-            subtitle = "Exposure, stops, and divergence",
-            footer = listOf("Margin" to "40%", "Stop gap" to "1.4%", "Orphans" to "0")
-        )
-        NjordMockData.riskChecks.forEach { RiskRow(it) }
-    }
-}
 
 @Composable
 private fun MoreScreen(onAction: (NjordAction) -> Unit) {
@@ -707,44 +796,6 @@ private fun MoreScreen(onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseActivityResponse(cachedBody)) {
-                        is ActivityResult.Success -> {
-                            val (summary, cycles) = mapApiActivity(cached.response)
-                            dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
-                        }
-                        is ActivityResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Activity)
-                        else -> {}
-                    }
-                }
-
-                when (val result = NjordApiClient.fetchActivityPayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseActivityResponse(result.body)) {
-                            is ActivityResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.Activity, result.body)
-                                val (summary, cycles) = mapApiActivity(parsed.response)
-                                dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
-                            }
-                            is ActivityResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
-    }
-
     Column(
         Modifier
             .padding(horizontal = 16.dp)
@@ -795,62 +846,6 @@ private fun ActivityScreen(state: NjordUiState, onAction: (NjordAction) -> Unit)
 
 @Composable
 private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseHeartbeatResponse(cachedBody)) {
-                        is HeartbeatResult.Success -> {
-                            val snapshot = mapApiHeartbeat(cached)
-                            dispatchUiAction(
-                                onAction,
-                                NjordAction.HeartbeatLoaded(
-                                    routines = snapshot.routines,
-                                    healthyCount = snapshot.healthyCount,
-                                    lateCount = snapshot.lateCount,
-                                    criticalCount = snapshot.criticalCount,
-                                    totalCount = snapshot.totalCount
-                                )
-                            )
-                        }
-                        is HeartbeatResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Heartbeat)
-                        else -> {}
-                    }
-                }
-
-                when (val result = NjordApiClient.fetchHeartbeatPayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseHeartbeatResponse(result.body)) {
-                            is HeartbeatResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.Heartbeat, result.body)
-                                val snapshot = mapApiHeartbeat(parsed)
-                                dispatchUiAction(
-                                    onAction,
-                                    NjordAction.HeartbeatLoaded(
-                                        routines = snapshot.routines,
-                                        healthyCount = snapshot.healthyCount,
-                                        lateCount = snapshot.lateCount,
-                                        criticalCount = snapshot.criticalCount,
-                                        totalCount = snapshot.totalCount
-                                    )
-                                )
-                            }
-                            is HeartbeatResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
-    }
-
     Column(
         Modifier
             .padding(horizontal = 16.dp)
@@ -880,45 +875,11 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
 
 @Composable
 private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
     val logs = visibleLogs(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter)
     var expandedLogIndex by remember { mutableStateOf<Int?>(null) }
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(state.logs, state.logFilter, state.logQuery, state.logStrategyFilter) {
         expandedLogIndex = null
-    }
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseLogsResponse(cachedBody)) {
-                        is LogsResult.Success -> dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
-                        is LogsResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
-                        else -> {}
-                    }
-                }
-
-                dispatchUiAction(onAction, NjordAction.LogsLoading)
-                when (val result = NjordApiClient.fetchLogsPayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseLogsResponse(result.body)) {
-                            is LogsResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.Logs, result.body)
-                                dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(parsed.entries)))
-                            }
-                            is LogsResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
     }
 
     Column(
@@ -970,41 +931,6 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val context = LocalContext.current.applicationContext
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    LaunchedEffect(lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            withContext(Dispatchers.IO) {
-                NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
-                    when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
-                        is HunchReportResult.Success -> dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
-                        is HunchReportResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
-                        else -> {}
-                    }
-                }
-
-                dispatchUiAction(onAction, NjordAction.HunchReportLoading)
-                when (val result = NjordApiClient.fetchHunchReportPayload(
-                    com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
-                    com.njord.mobile.BuildConfig.NJORD_API_KEY
-                )) {
-                    is ApiPayloadResult.Success -> {
-                        when (val parsed = NjordApiClient.parseHunchReportResponse(result.body)) {
-                            is HunchReportResult.Success -> {
-                                NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReport, result.body)
-                                dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(parsed.report)))
-                            }
-                            is HunchReportResult.Error -> showApiParseFailureToast(context, result, parsed.message)
-                            else -> {}
-                        }
-                    }
-                    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
-                }
-            }
-        }
-    }
-
     val report = state.hunchReport
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1838,13 +1764,6 @@ private fun LivePositionCard(position: LivePosition, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    "${position.strategyName} · ${position.opened} open",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1936,6 +1855,7 @@ private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
 
     SectionTitle("Live summary")
     LiveMetricPanel(items = analytics.summaryItems)
+    LongShortBar(analytics.longCount, analytics.shortCount, analytics.longPct)
 
     SectionTitle("Live metrics")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1959,10 +1879,19 @@ private fun LiveMetricPanel(items: List<MiniKpi>) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        listOf(items.take(2), items.drop(2)).filter { it.isNotEmpty() }.forEachIndexed { rowIndex, rowItems ->
+        val firstRow = items.take(3)
+        val secondRow = items.drop(3)
+        if (firstRow.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                rowItems.forEach { item ->
-                    LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f), compact = rowIndex > 0)
+                firstRow.forEach { item ->
+                    LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f), valueFontSize = 21.sp, subtextFontSize = 12.sp)
+                }
+            }
+        }
+        if (secondRow.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                secondRow.forEach { item ->
+                    LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f), valueFontSize = 18.sp, subtextFontSize = 11.sp)
                 }
             }
         }
@@ -1999,7 +1928,15 @@ private fun LiveContributionRow(strategy: String, progress: Float, value: String
 }
 
 @Composable
-private fun LiveMetricTile(label: String, value: String, subtext: String, tone: Tone, modifier: Modifier = Modifier, compact: Boolean = false) {
+private fun LiveMetricTile(
+    label: String,
+    value: String,
+    subtext: String,
+    tone: Tone,
+    modifier: Modifier = Modifier,
+    valueFontSize: androidx.compose.ui.unit.TextUnit = 24.sp,
+    subtextFontSize: androidx.compose.ui.unit.TextUnit = 13.sp
+) {
     val isPositive = value.startsWith("+")
     val valueColor = when {
         isPositive -> Success
@@ -2025,9 +1962,52 @@ private fun LiveMetricTile(label: String, value: String, subtext: String, tone: 
     ) {
         Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(9.dp))
-        Text(value, color = valueColor, fontSize = if (compact) 18.sp else 24.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = valueColor, fontSize = valueFontSize, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(4.dp))
-        Text(subtext, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(subtext, color = TextMuted, fontSize = subtextFontSize, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun LongShortBar(longCount: Int, shortCount: Int, longPct: Float) {
+    val barShape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Surface1)
+            .border(1.dp, Outline.copy(alpha = 0.65f), RoundedCornerShape(18.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("LONG", color = Success, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+            Text("SHORT", color = Danger, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .clip(barShape)
+                .background(Danger.copy(alpha = 0.55f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(longPct.coerceIn(0f, 1f))
+                    .background(Success.copy(alpha = 0.55f))
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(longCount.toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text(shortCount.toString(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
     }
 }
 
@@ -2060,20 +2040,6 @@ private fun LiveOutcomeTile(
     }
 }
 
-@Composable
-private fun RiskRow(check: RiskCheck) {
-    NjordCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CoinIcon(check.badge.take(2), check.tone)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(check.title, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text(check.subtitle, color = TextMuted, fontSize = 12.sp)
-            }
-            Badge(check.badge, check.tone)
-        }
-    }
-}
 
 @Composable
 private fun HeartbeatHealthCard(
@@ -2421,25 +2387,13 @@ private fun ActivitySideBadge(label: String, tone: Tone) {
 }
 
 @Composable
-private fun LineChartCard(title: String, subtitle: String, positive: Boolean) {
-    NjordCard {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            Text(subtitle, color = if (positive) Success else Danger, fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        ChartCanvas(positive = positive)
-    }
-}
-
-@Composable
 private fun ChartCanvas(
     positive: Boolean,
     showFill: Boolean = false,
     axisLabels: List<String> = emptyList(),
     points: List<ChartPoint> = emptyList()
 ) {
-    val chartPoints = points.ifEmpty { if (positive) NjordMockData.equityCurve else NjordMockData.drawdownCurve }
+    val chartPoints = points
     val lineColor = if (positive) Success else Danger
     Column(
         modifier = Modifier

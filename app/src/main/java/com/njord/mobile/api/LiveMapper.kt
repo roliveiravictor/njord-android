@@ -66,10 +66,8 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             )
         },
         summaryItems = listOf(
-            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Displayed filter", Tone.Muted),
+            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Leveraged capital", Tone.Muted),
             MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted),
-            MiniKpi("LONG", (summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) }).toString(), "${formatPercent(summary?.longPct ?: ratio(positions.count { it.side.equals("Long", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
-            MiniKpi("SHORT", (summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) }).toString(), "${formatPercent(summary?.shortPct ?: ratio(positions.count { it.side.equals("Short", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("INTEGRITY", "$positionCount/$cexPositionCount", "Cache vs. CEX", integrityTone(integrityMismatchCount))
         ),
         largestWinner = analytics.liveMetrics?.largestWinner?.let(::mapLiveOutcome),
@@ -78,7 +76,13 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             MiniKpi("Matched", (analytics.integrity?.matched ?: 0).toString(), "", Tone.Success),
             MiniKpi("Exchange", (analytics.integrity?.unclaimed ?: 0).toString(), "", integrityTone(analytics.integrity?.unclaimed ?: 0)),
             MiniKpi("Local", (analytics.integrity?.missing ?: 0).toString(), "", integrityTone(analytics.integrity?.missing ?: 0))
-        )
+        ),
+        longCount = summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) },
+        shortCount = summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) },
+        longPct = (summary?.longPct ?: ratio(
+            positions.count { it.side.equals("Long", ignoreCase = true) },
+            positions.size
+        )).toFloat()
     )
 }
 

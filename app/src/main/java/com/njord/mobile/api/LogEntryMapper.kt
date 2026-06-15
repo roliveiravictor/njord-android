@@ -31,7 +31,7 @@ internal fun mapApiEntries(entries: List<LogApiEntry>): List<LogEntry> =
                 else -> LogFilter.Info
             },
             strategy = strategy,
-            title = strategyTitle,
+            title = entry.title.ifBlank { strategyTitle },
             message = entry.message,
             time = parseTimestamp(entry.timestamp),
             searchText = listOfNotNull(

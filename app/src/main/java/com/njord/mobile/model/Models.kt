@@ -4,7 +4,6 @@ enum class Destination(val title: String, val subtitle: String) {
     Home("Home", "Balance, open P&L, and strategy health"),
     Portfolio("Portfolio", "Performance history filtered by strategy"),
     Live("Live", "Current open positions and real-time P&L"),
-    Risk("Risk", "Exposure, stops, and divergence"),
     More("More", "Operational diagnostics and reports"),
     Activity("Activity", "Candle-close cycles and strategy activity"),
     Heartbeat("Heartbeat", "8 concrete Njord service routines"),
@@ -336,7 +335,10 @@ data class LiveAnalyticsSnapshot(
     val summaryItems: List<MiniKpi>,
     val largestWinner: LiveOutcome?,
     val largestLoser: LiveOutcome?,
-    val integrityItems: List<MiniKpi>
+    val integrityItems: List<MiniKpi>,
+    val longCount: Int,
+    val shortCount: Int,
+    val longPct: Float
 )
 
 data class LiveContribution(
@@ -383,7 +385,6 @@ data class LivePosition(
     val trendUp: Boolean
 )
 
-data class RiskCheck(val title: String, val subtitle: String, val badge: String, val tone: Tone)
 data class HeartbeatRoutine(val name: String, val status: String, val age: String, val cadence: String, val tone: Tone)
 data class LogEntry(
     val level: LogFilter,
