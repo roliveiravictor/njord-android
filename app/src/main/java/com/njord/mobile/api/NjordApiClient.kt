@@ -9,7 +9,11 @@ data class LogApiEntry(
     val level: String,
     val title: String,
     val message: String,
-    val timestamp: String
+    val timestamp: String,
+    val strategy: String? = null,
+    val strategyName: String? = null,
+    val causeStrategy: String? = null,
+    val causeStrategyName: String? = null
 )
 
 data class HunchReportApiResponse(
@@ -327,7 +331,7 @@ object NjordApiClient {
         fetchPayload("$baseUrl/v1/home", apiKey, "fetchHome")
 
     fun fetchActivityPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
-        fetchPayload("$baseUrl/v1/activity?limit=5", apiKey, "fetchActivity")
+        fetchPayload(activityUrl(baseUrl), apiKey, "fetchActivity")
 
     fun fetchLivePayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload(liveUrl(baseUrl), apiKey, "fetchLive")
@@ -644,11 +648,18 @@ object NjordApiClient {
                 ?: return LogsResult.Error("Missing 'entries' key")
             val entries = (0 until entriesArray.length()).mapNotNull { i ->
                 val obj = entriesArray.optJSONObject(i) ?: return@mapNotNull null
+                val cause = obj.optJSONObject("cause")
                 LogApiEntry(
                     level = obj.optString("level", "INFO"),
                     title = obj.optString("title", ""),
-                    message = obj.optString("message", ""),
-                    timestamp = obj.optString("timestamp", "")
+                    message = obj.firstOptionalString("full_message", "fullMessage", "details", "detail", "text")
+                        ?: obj.optString("message", ""),
+                    timestamp = obj.optString("timestamp", ""),
+                    strategy = obj.optionalString("strategy"),
+                    strategyName = obj.optionalString("strategy_name"),
+                    causeStrategy = obj.optionalString("cause_strategy") ?: cause?.optionalString("strategy"),
+                    causeStrategyName = obj.optionalString("cause_strategy_name")
+                        ?: cause?.firstOptionalString("strategy_name", "strategy_label", "display_name")
                 )
             }
             LogsResult.Success(entries)
@@ -717,8 +728,8 @@ object NjordApiClient {
 
     private fun openConnection(url: String, apiKey: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 4_000
-            readTimeout = 4_000
+            connectTimeout = 15_000
+            readTimeout = 15_000
             requestMethod = "GET"
             setRequestProperty("User-Agent", "Njord Android")
             setRequestProperty("X-API-Key", apiKey)
@@ -726,6 +737,9 @@ object NjordApiClient {
 
     internal fun logsUrl(baseUrl: String): String =
         "$baseUrl/v1/logs?hours=24&limit=5000&exclude_heartbeat=true"
+
+    internal fun activityUrl(baseUrl: String): String =
+        "$baseUrl/v1/activity?limit=1"
 
     internal fun liveUrl(baseUrl: String): String =
         "$baseUrl/v1/live"
@@ -736,6 +750,9 @@ object NjordApiClient {
 
 private fun JSONObject.optionalString(name: String): String? =
     if (isNull(name)) null else optString(name).takeIf { it.isNotBlank() }
+
+private fun JSONObject.firstOptionalString(vararg names: String): String? =
+    names.firstNotNullOfOrNull(::optionalString)
 
 private fun JSONObject.optionalDouble(name: String): Double? =
     if (isNull(name) || !has(name)) null else optDouble(name)

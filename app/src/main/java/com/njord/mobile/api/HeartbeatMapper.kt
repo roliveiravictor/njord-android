@@ -8,6 +8,9 @@ import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
+private val redundantHeartbeatRoutineKeywords = Regex("\\b(heartbeat|liveness|snapshot)\\b", RegexOption.IGNORE_CASE)
+private val whitespace = Regex("\\s+")
+
 data class HeartbeatSnapshot(
     val healthyCount: Int,
     val lateCount: Int,
@@ -26,7 +29,7 @@ internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Ins
             .sortedBy { service -> service.status.toHeartbeatSortRank() }
             .map { service ->
                 HeartbeatRoutine(
-                    name = service.displayName ?: service.name,
+                    name = service.toRoutineName(),
                     status = service.status.toHeartbeatLabel(),
                     age = service.lastSeenAt.toAgeLabel(now),
                     cadence = service.expectedCadenceSeconds.toCadenceLabel(),
@@ -34,6 +37,15 @@ internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Ins
                 )
             }
     )
+
+private fun HeartbeatApiService.toRoutineName(): String {
+    val source = displayName ?: name.replace('_', ' ').replace('-', ' ')
+    val cleaned = source
+        .replace(redundantHeartbeatRoutineKeywords, "")
+        .replace(whitespace, " ")
+        .trim()
+    return cleaned.ifBlank { source }
+}
 
 private fun String.toHeartbeatSortRank(): Int =
     if (equals("healthy", ignoreCase = true)) 0 else 1

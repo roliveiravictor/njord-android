@@ -14,6 +14,7 @@ private val USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US)
 
 internal fun mapApiReport(report: HunchReportApiResponse): HunchReport {
     val rawSignal = report.rawSignal ?: report.signal
+    val wasSignalCorrect = report.wasSignalCorrect.takeUnless { rawSignal.equals("NEUTRAL", ignoreCase = true) }
     return HunchReport(
         title = "Hunch BTC Signal - ${report.date}",
         persistedAge = report.createdAt?.let(::formatPersistedAge) ?: "Latest persisted report",
@@ -26,8 +27,8 @@ internal fun mapApiReport(report: HunchReportApiResponse): HunchReport {
         currentBtcPrice = report.currentBtcPrice?.let(USD_FORMATTER::format) ?: "N/A",
         priceDelta = report.priceDeltaPct?.let { formatSignedPercent(it) } ?: "N/A",
         priceDeltaTone = report.priceDeltaPct?.let(::numberTone) ?: Tone.Muted,
-        wasSignalCorrect = report.wasSignalCorrect?.let { if (it) "YES" else "NO" } ?: "N/A",
-        wasSignalCorrectTone = when (report.wasSignalCorrect) {
+        wasSignalCorrect = wasSignalCorrect?.let { if (it) "YES" else "NO" } ?: "N/A",
+        wasSignalCorrectTone = when (wasSignalCorrect) {
             true -> Tone.Success
             false -> Tone.Danger
             null -> Tone.Muted

@@ -1856,9 +1856,6 @@ private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
             LiveOutcomeTile("LARGEST LOSER", it.symbol, it.amount, it.percent, it.tone, Modifier.weight(1f))
         } ?: LiveOutcomeTile("LARGEST LOSER", "N/A", "--", "--", Tone.Muted, Modifier.weight(1f))
     }
-
-    SectionTitle("Position integrity")
-    LiveIntegrityPanel(items = analytics.integrityItems)
 }
 
 @Composable
@@ -1872,32 +1869,11 @@ private fun LiveMetricPanel(items: List<MiniKpi>) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items.chunked(3).forEachIndexed { rowIndex, rowItems ->
+        listOf(items.take(3), items.drop(3)).filter { it.isNotEmpty() }.forEachIndexed { rowIndex, rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowItems.forEach { item ->
                     LiveMetricTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f), compact = rowIndex > 0)
                 }
-                repeat(3 - rowItems.size) {
-                    Spacer(Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveIntegrityPanel(items: List<MiniKpi>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Surface1)
-            .border(1.dp, Outline.copy(alpha = 0.65f), RoundedCornerShape(22.dp))
-            .padding(14.dp)
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items.forEach { item ->
-                LiveIntegrityTile(item.label, item.value, item.subtext, item.tone, Modifier.weight(1f))
             }
         }
     }
@@ -1990,27 +1966,6 @@ private fun LiveOutcomeTile(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(amount, color = toneColor(tone), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             Text(" · $percent", color = TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
-private fun LiveIntegrityTile(label: String, value: String, subtext: String, tone: Tone, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 98.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (tone == Tone.Warning) Warning.copy(alpha = 0.16f) else Surface3.copy(alpha = 0.78f))
-            .border(1.dp, toneColor(tone).copy(alpha = if (tone == Tone.Muted) 0.08f else 0.35f), RoundedCornerShape(16.dp))
-            .padding(horizontal = 4.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(7.dp))
-        Text(value, color = toneColor(tone), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-        if (subtext.isNotBlank()) {
-            Text(subtext, color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -2182,9 +2137,10 @@ private fun LogRow(log: LogEntry, expanded: Boolean, onClick: () -> Unit) {
                 ) {
                     Text(
                         log.message.wrapLongTokens(),
-                        color = TextMuted,
-                        fontSize = 12.sp,
-                        overflow = TextOverflow.Clip
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        overflow = TextOverflow.Visible
                     )
                 }
             } else {
@@ -2808,8 +2764,8 @@ private fun decodeLogoBytes(bytes: ByteArray): ImageBitmap? =
 
 private fun openHttpConnection(url: String): HttpURLConnection =
     (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 4_000
-        readTimeout = 4_000
+        connectTimeout = 15_000
+        readTimeout = 15_000
         requestMethod = "GET"
         setRequestProperty("User-Agent", "Njord Android")
     }

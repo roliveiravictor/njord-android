@@ -5,21 +5,20 @@ import com.njord.mobile.model.ActivitySummary
 import com.njord.mobile.model.StrategyCycle
 
 internal fun mapApiActivity(response: ActivityApiResponse): Pair<ActivitySummary, List<StrategyCycle>> {
+    val latestCycle = response.cycles.firstOrNull()
     val summary = ActivitySummary(
-        opened = response.cycles.sumOf { it.totalOpened }.toString(),
-        closed = response.cycles.sumOf { it.totalClosed }.toString(),
-        kept = response.cycles.sumOf { it.totalKept }.toString()
+        opened = (latestCycle?.totalOpened ?: 0).toString(),
+        closed = (latestCycle?.totalClosed ?: 0).toString(),
+        kept = (latestCycle?.totalKept ?: 0).toString()
     )
 
     val actionsByStrategy = linkedMapOf<String, MutableList<ActivityAction>>()
-    response.cycles.forEach { cycle ->
-        cycle.strategies.forEach { strategy ->
-            val strategyName = formatStrategyName(strategy.name)
-            val actions = actionsByStrategy.getOrPut(strategyName) { mutableListOf() }
-            strategy.opened.forEach { actions.add(ActivityAction("Opened", formatSymbol(it.symbol), formatSide(it.side))) }
-            strategy.closed.forEach { actions.add(ActivityAction("Closed", formatSymbol(it.symbol), formatSide(it.side))) }
-            strategy.kept.forEach { actions.add(ActivityAction("Kept", formatSymbol(it.symbol), formatSide(it.side))) }
-        }
+    latestCycle?.strategies?.forEach { strategy ->
+        val strategyName = formatStrategyName(strategy.name)
+        val actions = actionsByStrategy.getOrPut(strategyName) { mutableListOf() }
+        strategy.opened.forEach { actions.add(ActivityAction("Opened", formatSymbol(it.symbol), formatSide(it.side))) }
+        strategy.closed.forEach { actions.add(ActivityAction("Closed", formatSymbol(it.symbol), formatSide(it.side))) }
+        strategy.kept.forEach { actions.add(ActivityAction("Kept", formatSymbol(it.symbol), formatSide(it.side))) }
     }
 
     val cycles = actionsByStrategy.map { (strategyName, actions) ->

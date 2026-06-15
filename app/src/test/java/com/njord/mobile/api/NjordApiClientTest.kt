@@ -1,6 +1,7 @@
 package com.njord.mobile.api
 
 import com.njord.mobile.model.StrategyFilter
+import com.njord.mobile.model.Tone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -22,6 +23,13 @@ class NjordApiClientTest {
         val url = NjordApiClient.logsUrl("https://noatun.dev")
 
         assertEquals("https://noatun.dev/v1/logs?hours=24&limit=5000&exclude_heartbeat=true", url)
+    }
+
+    @Test
+    fun activityUrl_requestsOnlyLatestCycle() {
+        val url = NjordApiClient.activityUrl("https://noatun.dev")
+
+        assertEquals("https://noatun.dev/v1/activity?limit=1", url)
     }
 
     @Test
@@ -55,6 +63,57 @@ class NjordApiClientTest {
         assertEquals("Rebalance complete", entries[0].message)
         assertEquals("2026-06-12T14:23:01", entries[0].timestamp)
         assertEquals("WARNING", entries[1].level)
+    }
+
+    @Test
+    fun parseLogsResponse_readsStrategyMetadata() {
+        val json = makeValidJson(
+            """
+                {
+                  "level":"INFO",
+                  "title":"session.snapshot",
+                  "message":"Combining active logs into session snapshot",
+                  "timestamp":"2026-06-12T14:23:01",
+                  "strategy":"wcr",
+                  "strategy_name":"WCR",
+                  "cause_strategy":"big_bang",
+                  "cause_strategy_name":"Big Bang"
+                }
+            """.trimIndent()
+        )
+
+        val result = NjordApiClient.parseLogsResponse(json)
+
+        assertTrue(result is LogsResult.Success)
+        val entry = (result as LogsResult.Success).entries.single()
+        assertEquals("wcr", entry.strategy)
+        assertEquals("WCR", entry.strategyName)
+        assertEquals("big_bang", entry.causeStrategy)
+        assertEquals("Big Bang", entry.causeStrategyName)
+    }
+
+    @Test
+    fun parseLogsResponse_prefersFullMessageAndNestedCauseMetadata() {
+        val json = makeValidJson(
+            """
+                {
+                  "level":"INFO",
+                  "title":"session.snapshot",
+                  "message":"Combining active logs into session snapshot...",
+                  "full_message":"Combining active logs into session snapshot with 24 records",
+                  "timestamp":"2026-06-12T14:23:01",
+                  "cause":{"strategy":"big_bang","strategy_name":"Big Bang"}
+                }
+            """.trimIndent()
+        )
+
+        val result = NjordApiClient.parseLogsResponse(json)
+
+        assertTrue(result is LogsResult.Success)
+        val entry = (result as LogsResult.Success).entries.single()
+        assertEquals("Combining active logs into session snapshot with 24 records", entry.message)
+        assertEquals("big_bang", entry.causeStrategy)
+        assertEquals("Big Bang", entry.causeStrategyName)
     }
 
     @Test
@@ -457,7 +516,10 @@ class NjordApiClientTest {
         assertEquals("170.61 ATOM", positions[0].size)
         assertEquals("-\$3.38", analytics?.totalContribution)
         assertEquals("Big Bang", analytics?.strategyContributions?.single()?.strategy)
-        assertEquals("2d", analytics?.summaryItems?.last()?.value)
+        assertEquals("2d", analytics?.summaryItems?.get(2)?.value)
+        assertEquals("INTEGRITY", analytics?.summaryItems?.last()?.label)
+        assertEquals("1/1", analytics?.summaryItems?.last()?.value)
+        assertEquals("Cache vs. CEX", analytics?.summaryItems?.last()?.subtext)
         assertEquals("ATOM", analytics?.largestLoser?.symbol)
         assertEquals("1", analytics?.integrityItems?.get(1)?.value)
         assertEquals("WCR", incidents.single().subtitle)
@@ -465,7 +527,7 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun mapApiActivity_includesAllReturnedCyclesAndNormalizesSymbols() {
+    fun mapApiActivity_usesLatestReturnedCycleAndNormalizesSymbols() {
         val response = ActivityApiResponse(
             cycles = listOf(
                 ActivityApiCycle(
@@ -506,17 +568,16 @@ class NjordApiClientTest {
 
         val (summary, cycles) = mapApiActivity(response)
 
-        assertEquals("2", summary.opened)
-        assertEquals("1", summary.closed)
+        assertEquals("0", summary.opened)
+        assertEquals("0", summary.closed)
         assertEquals("1", summary.kept)
-        assertEquals(listOf("Big Bang", "WCR"), cycles.map { it.strategy })
-        assertEquals(listOf("ATOM"), cycles[0].actions.map { it.symbol })
-        assertEquals(listOf("TON", "ENA", "BTC"), cycles[1].actions.map { it.symbol })
-        assertEquals(listOf("Long", "Short", "Long"), cycles[1].actions.map { it.side })
+        assertEquals(listOf("Big Bang"), cycles.map { it.strategy })
+        assertEquals(listOf("ATOM"), cycles.single().actions.map { it.symbol })
+        assertEquals(listOf("Long"), cycles.single().actions.map { it.side })
     }
 
     @Test
-    fun mapApiActivity_mergesRepeatedStrategyRowsAcrossRecentCycles() {
+    fun mapApiActivity_ignoresOlderCyclesFromCachedMultiCycleResponses() {
         val response = ActivityApiResponse(
             cycles = listOf(
                 ActivityApiCycle(
@@ -556,7 +617,7 @@ class NjordApiClientTest {
 
         assertEquals(1, cycles.size)
         assertEquals("WCR", cycles.single().strategy)
-        assertEquals(listOf("PENGU", "BCH", "FET"), cycles.single().actions.map { it.symbol })
+        assertEquals(listOf("PENGU", "BCH"), cycles.single().actions.map { it.symbol })
     }
 
     @Test
@@ -631,6 +692,31 @@ class NjordApiClientTest {
         assertEquals(1, report.keyFactors.size)
         assertEquals(1, report.risks.size)
         assertEquals(2, report.layerScores.size)
+    }
+
+    @Test
+    fun mapApiReport_neutralSignalShowsCorrectAsNotApplicable() {
+        val apiReport = HunchReportApiResponse(
+            date = "2026-06-12",
+            signal = "NEUTRAL",
+            rawSignal = "NEUTRAL",
+            createdAt = null,
+            confidence = "low",
+            score = 0.123,
+            btcPriceAtSignal = 62215.0,
+            currentBtcPrice = 63193.5,
+            priceDeltaPct = 1.57,
+            wasSignalCorrect = true,
+            keyFactors = emptyList(),
+            risks = emptyList(),
+            layerScores = emptyMap()
+        )
+
+        val report = mapApiReport(apiReport)
+
+        assertEquals("NEUTRAL", report.signal)
+        assertEquals("N/A", report.wasSignalCorrect)
+        assertEquals(Tone.Muted, report.wasSignalCorrectTone)
     }
 
     @Test
@@ -764,6 +850,26 @@ class NjordApiClientTest {
         assertEquals(StrategyFilter.BigBang, mapApiEntries(entries)[0].strategy)
     }
 
+    @Test
+    fun mapApiEntries_causeStrategy_setsCardTitleAndFilterStrategy() {
+        val entries = listOf(
+            LogApiEntry(
+                level = "INFO",
+                title = "session.snapshot",
+                message = "Combining active logs into session snapshot",
+                timestamp = "2026-06-12T14:00:00",
+                strategy = "wcr",
+                strategyName = "WCR",
+                causeStrategy = "big_bang"
+            )
+        )
+
+        val log = mapApiEntries(entries).single()
+
+        assertEquals(StrategyFilter.BigBang, log.strategy)
+        assertEquals("Big Bang", log.title)
+    }
+
     private fun makeApiEntry(level: String, title: String, message: String, timestamp: String) =
         LogApiEntry(level = level, title = title, message = message, timestamp = timestamp)
 
@@ -808,11 +914,11 @@ class NjordApiClientTest {
         assertEquals(1, snapshot.lateCount)
         assertEquals(0, snapshot.criticalCount)
         assertEquals(8, snapshot.totalCount)
-        assertEquals("VPN heartbeat", snapshot.routines[0].name)
+        assertEquals("VPN", snapshot.routines[0].name)
         assertEquals("Healthy", snapshot.routines[0].status)
         assertEquals("3m ago", snapshot.routines[0].age)
         assertEquals("20m", snapshot.routines[0].cadence)
-        assertEquals("Database snapshot", snapshot.routines[1].name)
+        assertEquals("Database", snapshot.routines[1].name)
         assertEquals("Unknown", snapshot.routines[1].status)
         assertEquals("Never", snapshot.routines[1].age)
         assertEquals("Late", snapshot.routines[2].status)

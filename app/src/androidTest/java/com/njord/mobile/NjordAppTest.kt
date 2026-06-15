@@ -153,11 +153,11 @@ class NjordAppTest {
         compose.onNodeWithText("1 late").assertIsDisplayed()
         compose.onNodeWithText("0 critical").assertIsDisplayed()
         compose.onNodeWithText("Service routines").assertIsDisplayed()
-        compose.onNodeWithText("VPN heartbeat").assertIsDisplayed()
+        compose.onNodeWithText("VPN").assertIsDisplayed()
         compose.onNodeWithText("2m ago").assertIsDisplayed()
-        compose.onNodeWithText("Strategy liveness").assertIsDisplayed()
-        compose.onNodeWithText("Database snapshot").assertIsDisplayed()
-        compose.onNodeWithText("Log snapshot").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Strategy").assertIsDisplayed()
+        compose.onNodeWithText("Database").assertIsDisplayed()
+        compose.onNodeWithText("Log").performScrollTo().assertIsDisplayed()
     }
 
     @Test

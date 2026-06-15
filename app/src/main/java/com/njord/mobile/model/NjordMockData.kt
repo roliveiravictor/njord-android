@@ -85,11 +85,11 @@ object NjordMockData {
     )
 
     val heartbeatRoutines = listOf(
-        HeartbeatRoutine("VPN heartbeat", "Healthy", "2m ago", "20m", Tone.Success),
-        HeartbeatRoutine("Strategy liveness", "Healthy", "3m ago", "20m", Tone.Success),
-        HeartbeatRoutine("Database snapshot", "Healthy", "12m ago", "20m", Tone.Success),
-        HeartbeatRoutine("Log snapshot", "Healthy", "14m ago", "20m", Tone.Success),
-        HeartbeatRoutine("Git heartbeat", "Healthy", "8m ago", "20m", Tone.Success),
+        HeartbeatRoutine("VPN", "Healthy", "2m ago", "20m", Tone.Success),
+        HeartbeatRoutine("Strategy", "Healthy", "3m ago", "20m", Tone.Success),
+        HeartbeatRoutine("Database", "Healthy", "12m ago", "20m", Tone.Success),
+        HeartbeatRoutine("Log", "Healthy", "14m ago", "20m", Tone.Success),
+        HeartbeatRoutine("Git", "Healthy", "8m ago", "20m", Tone.Success),
         HeartbeatRoutine("Weekly performance report", "Late", "26m ago", "20m", Tone.Warning),
         HeartbeatRoutine("PnL stop loss", "Healthy", "8m ago", "15m", Tone.Success),
         HeartbeatRoutine("PnL trailing stop", "Healthy", "9m ago", "15m", Tone.Success)

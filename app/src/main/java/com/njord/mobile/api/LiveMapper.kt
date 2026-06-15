@@ -49,6 +49,10 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
     val summary = analytics.liveSummary
     val totalPnl = summary?.totalUnrealizedPnl
         ?: analytics.strategyContributions.sumOf { it.unrealizedPnl }
+    val integrity = analytics.integrity
+    val positionCount = summary?.positionCount ?: positions.size
+    val cexPositionCount = integrity?.unclaimed ?: positionCount
+    val integrityMismatchCount = abs(positionCount - cexPositionCount) + (integrity?.duplicate ?: 0)
     return LiveAnalyticsSnapshot(
         totalContribution = formatSignedCurrency(totalPnl),
         totalContributionTone = toneFor(totalPnl),
@@ -61,12 +65,13 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             )
         },
         summaryItems = listOf(
-            MiniKpi("POSITIONS", (summary?.positionCount ?: positions.size).toString(), "Current open", Tone.Primary),
-            MiniKpi("LONG", (summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) }).toString(), "${formatPercent(summary?.longPct ?: ratio(positions.count { it.side.equals("Long", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
-            MiniKpi("SHORT", (summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) }).toString(), "${formatPercent(summary?.shortPct ?: ratio(positions.count { it.side.equals("Short", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("OPEN P&L", formatSignedCurrency(totalPnl), "All strategies", toneFor(totalPnl)),
             MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Displayed filter", Tone.Muted),
-            MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted)
+            MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted),
+            MiniKpi("POSITIONS", positionCount.toString(), "Current open", Tone.Primary),
+            MiniKpi("LONG", (summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) }).toString(), "${formatPercent(summary?.longPct ?: ratio(positions.count { it.side.equals("Long", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
+            MiniKpi("SHORT", (summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) }).toString(), "${formatPercent(summary?.shortPct ?: ratio(positions.count { it.side.equals("Short", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
+            MiniKpi("INTEGRITY", "$positionCount/$cexPositionCount", "Cache vs. CEX", integrityTone(integrityMismatchCount))
         ),
         largestWinner = analytics.liveMetrics?.largestWinner?.let(::mapLiveOutcome),
         largestLoser = analytics.liveMetrics?.largestLoser?.let(::mapLiveOutcome),
