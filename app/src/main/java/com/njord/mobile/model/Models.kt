@@ -385,7 +385,7 @@ data class LivePosition(
     val trendUp: Boolean
 )
 
-data class HeartbeatRoutine(val name: String, val status: String, val age: String, val cadence: String, val tone: Tone)
+data class HeartbeatRoutine(val name: String, val status: String, val lastSeenAt: java.time.Instant?, val cadence: String, val tone: Tone, val secondsOverdue: Int?, val expectedCadenceSeconds: Int)
 data class LogEntry(
     val level: LogFilter,
     val strategy: StrategyFilter,

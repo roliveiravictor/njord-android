@@ -123,6 +123,7 @@ import com.njord.mobile.api.ActivityResult
 import com.njord.mobile.api.PortfolioResult
 import com.njord.mobile.api.mapApiActivity
 import com.njord.mobile.api.mapApiHeartbeat
+import com.njord.mobile.api.toAgeLabel
 import com.njord.mobile.api.mapApiHome
 import com.njord.mobile.api.mapApiLive
 import com.njord.mobile.api.mapApiPortfolio
@@ -150,6 +151,7 @@ import com.njord.mobile.model.visibleLogs
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -258,33 +260,28 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
     LaunchedEffect(state.destination) {
         listState.scrollToItem(0)
+        launchLoadForDestination(state, context, onAction, scope)
     }
 
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            scope.launch(Dispatchers.IO) { loadHomeData(context, onAction) }
-            scope.launch(Dispatchers.IO) {
-                loadLiveData(context, onAction, liveApiStrategy(state.liveStrategyFilter), liveCacheKey(state.liveStrategyFilter))
-            }
+            launchLoadForDestination(state, context, onAction, scope)
         }
     }
 
     LaunchedEffect(state.liveStrategyFilter) {
-        scope.launch(Dispatchers.IO) {
-            loadLiveData(context, onAction, liveApiStrategy(state.liveStrategyFilter), liveCacheKey(state.liveStrategyFilter))
+        if (state.destination == Destination.Live) {
+            val strategy = liveApiStrategy(state.liveStrategyFilter)
+            val cacheKey = liveCacheKey(state.liveStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadLiveData(context, onAction, strategy, cacheKey) }
         }
     }
 
-    LaunchedEffect(state.destination, state.portfolioStrategyFilter) {
-        val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
-        val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
-        when (state.destination) {
-            Destination.Portfolio -> scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
-            Destination.Activity -> scope.launch(Dispatchers.IO) { loadActivityData(context, onAction) }
-            Destination.Heartbeat -> scope.launch(Dispatchers.IO) { loadHeartbeatData(context, onAction) }
-            Destination.Logs -> scope.launch(Dispatchers.IO) { loadLogsData(context, onAction) }
-            Destination.Reports -> scope.launch(Dispatchers.IO) { loadHunchReportData(context, onAction) }
-            else -> {}
+    LaunchedEffect(state.portfolioStrategyFilter) {
+        if (state.destination == Destination.Portfolio) {
+            val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
+            val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
         }
     }
 
@@ -367,6 +364,32 @@ private fun ScreenHeader(destination: Destination) {
     Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         Text(destination.title, color = TextPrimary, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
         Text(destination.subtitle, color = TextMuted, fontSize = 13.sp)
+    }
+}
+
+private fun launchLoadForDestination(
+    state: NjordUiState,
+    context: Context,
+    onAction: (NjordAction) -> Unit,
+    scope: CoroutineScope
+) {
+    when (state.destination) {
+        Destination.Home -> scope.launch(Dispatchers.IO) { loadHomeData(context, onAction) }
+        Destination.Live -> {
+            val strategy = liveApiStrategy(state.liveStrategyFilter)
+            val cacheKey = liveCacheKey(state.liveStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadLiveData(context, onAction, strategy, cacheKey) }
+        }
+        Destination.Portfolio -> {
+            val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
+            val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
+        }
+        Destination.Activity -> scope.launch(Dispatchers.IO) { loadActivityData(context, onAction) }
+        Destination.Heartbeat -> scope.launch(Dispatchers.IO) { loadHeartbeatData(context, onAction) }
+        Destination.Logs -> scope.launch(Dispatchers.IO) { loadLogsData(context, onAction) }
+        Destination.Reports -> scope.launch(Dispatchers.IO) { loadHunchReportData(context, onAction) }
+        Destination.More -> {}
     }
 }
 
@@ -466,6 +489,7 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
         is ApiPayloadResult.Error -> showApiFailureToast(context, result)
     }
 }
+
 
 private suspend fun loadPortfolioData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
     NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
@@ -747,7 +771,7 @@ private fun LiveScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             onSideSelect = { onAction(NjordAction.SetLiveSideFilter(it)) }
         )
         LiveIncidentCarousel(incidents) { onAction(NjordAction.SelectIncident(it)) }
-        LiveAnalyticsSections(state.liveAnalytics)
+        LiveAnalyticsSections(state.liveAnalytics, state.liveStrategyFilter)
         if (positions.isEmpty()) {
             NjordCard(Modifier.testTag("emptyLivePositions")) {
                 Text("No open positions match this filter.", color = TextMuted, fontSize = 13.sp)
@@ -1829,25 +1853,33 @@ private fun LiveFooterValue(label: String, value: String, modifier: Modifier = M
 }
 
 @Composable
-private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?) {
+private fun LiveAnalyticsSections(analytics: LiveAnalyticsSnapshot?, strategyFilter: StrategyFilter) {
     if (analytics == null) return
+
+    val visibleContributions = if (strategyFilter == StrategyFilter.All) {
+        analytics.strategyContributions
+    } else {
+        analytics.strategyContributions.filter { it.strategy.equals(strategyFilter.label, ignoreCase = true) }
+    }
+    val displayTotal = visibleContributions.singleOrNull()?.value ?: analytics.totalContribution
+    val displayTotalTone = visibleContributions.singleOrNull()?.tone ?: analytics.totalContributionTone
 
     SectionTitle("Open P&L by strategy")
     NjordCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Text("Current contribution", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             Text(
-                analytics.totalContribution,
-                color = toneColor(analytics.totalContributionTone),
+                displayTotal,
+                color = toneColor(displayTotalTone),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.ExtraBold
             )
         }
         Spacer(Modifier.height(16.dp))
-        if (analytics.strategyContributions.isEmpty()) {
+        if (visibleContributions.isEmpty()) {
             Text("No strategy contribution data available yet.", color = TextMuted, fontSize = 13.sp)
         } else {
-            analytics.strategyContributions.forEach {
+            visibleContributions.forEach {
                 LiveContributionRow(it.strategy, it.progress, it.value, it.tone)
             }
         }
@@ -1943,10 +1975,15 @@ private fun LiveMetricTile(
         value.startsWith("-") -> Danger
         else -> toneColor(tone)
     }
+    val adaptedFontSize = when {
+        value.length >= 8 -> (valueFontSize.value * 0.78f).sp
+        value.length >= 7 -> (valueFontSize.value * 0.88f).sp
+        else -> valueFontSize
+    }
     Column(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 96.dp)
+            .heightIn(min = 88.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.linearGradient(
@@ -1962,9 +1999,7 @@ private fun LiveMetricTile(
     ) {
         Text(label, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(9.dp))
-        Text(value, color = valueColor, fontSize = valueFontSize, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(4.dp))
-        Text(subtext, color = TextMuted, fontSize = subtextFontSize, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = valueColor, fontSize = adaptedFontSize, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1981,21 +2016,21 @@ private fun LongShortBar(longCount: Int, shortCount: Int, longPct: Float) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("LONG", color = Success, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
-            Text("SHORT", color = Danger, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Long (${(longPct * 100).toInt()}%)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Text("(${((1f - longPct) * 100).toInt()}%) Short", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(42.dp)
                 .clip(barShape)
-                .background(Danger.copy(alpha = 0.55f))
+                .background(Danger.copy(alpha = 0.72f))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(longPct.coerceIn(0f, 1f))
-                    .background(Success.copy(alpha = 0.55f))
+                    .background(Success.copy(alpha = 0.72f))
             )
             Row(
                 modifier = Modifier
@@ -2127,7 +2162,7 @@ private fun HeartbeatRow(routine: HeartbeatRoutine) {
                 )
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    routine.age,
+                    toAgeLabel(routine.secondsOverdue, routine.expectedCadenceSeconds, routine.lastSeenAt),
                     color = TextMuted,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.ExtraBold

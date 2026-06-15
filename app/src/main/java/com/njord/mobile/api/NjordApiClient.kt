@@ -415,9 +415,9 @@ object NjordApiClient {
                     latestCycle = latestCycleObject?.let {
                         HomeApiCycle(
                             timestamp = it.optString("timestamp", ""),
-                            openedCount = it.optInt("opened_count", 0),
-                            closedCount = it.optInt("closed_count", 0),
-                            keptCount = it.optInt("kept_count", 0)
+                            openedCount = it.requiredInt("opened_count"),
+                            closedCount = it.requiredInt("closed_count"),
+                            keptCount = it.requiredInt("kept_count")
                         )
                     },
                     heartbeat = HomeApiHeartbeat(
@@ -454,9 +454,9 @@ object NjordApiClient {
                 ActivityApiCycle(
                     timestamp = cycleObj.optString("timestamp", ""),
                     cycleStatus = cycleObj.optString("cycle_status", ""),
-                    totalOpened = cycleObj.optInt("total_opened", 0),
-                    totalClosed = cycleObj.optInt("total_closed", 0),
-                    totalKept = cycleObj.optInt("total_kept", 0),
+                    totalOpened = cycleObj.requiredInt("total_opened"),
+                    totalClosed = cycleObj.requiredInt("total_closed"),
+                    totalKept = cycleObj.requiredInt("total_kept"),
                     strategies = strategies
                 )
             }
@@ -812,6 +812,11 @@ private fun JSONObject.optionalDouble(name: String): Double? =
 
 private fun JSONObject.optionalInt(name: String): Int? =
     if (isNull(name) || !has(name)) null else optInt(name)
+
+private fun JSONObject.requiredInt(name: String): Int {
+    if (isNull(name) || !has(name)) throw IllegalArgumentException("Missing '$name' key")
+    return getInt(name)
+}
 
 private fun JSONObject.optionalBoolean(name: String): Boolean? =
     if (isNull(name) || !has(name)) null else optBoolean(name)

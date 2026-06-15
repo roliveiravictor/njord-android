@@ -18,7 +18,7 @@ class NjordReducerTest {
     @Test
     fun liveFilters_filterByStrategyAndSide() {
         val filtered = visibleLivePositions(
-            positions = NjordMockData.livePositions,
+            positions = ReducerFixtures.livePositions,
             strategyFilter = StrategyFilter.Wcr,
             sideFilter = SideFilter.Short
         )
@@ -30,7 +30,7 @@ class NjordReducerTest {
     @Test
     fun logFilters_matchSeverityAndSearch() {
         val filtered = visibleLogs(
-            logs = NjordMockData.logs,
+            logs = ReducerFixtures.logs,
             filter = LogFilter.Error,
             query = "margin",
             strategyFilter = StrategyFilter.All
@@ -43,7 +43,7 @@ class NjordReducerTest {
 
     @Test
     fun dismissIncident_hidesIncidentBanner() {
-        val incident = NjordMockData.incidents.first()
+        val incident = ReducerFixtures.incidents.first()
         val state = reduce(
             NjordUiState(selectedIncident = incident, liveIncidents = listOf(incident)),
             NjordAction.DismissIncident(incident.id)
@@ -55,7 +55,7 @@ class NjordReducerTest {
 
     @Test
     fun selectPosition_opensBottomSheetState() {
-        val position = NjordMockData.livePositions.first()
+        val position = ReducerFixtures.livePositions.first()
         val state = reduce(NjordUiState(), NjordAction.SelectPosition(position))
 
         assertEquals(position, state.selectedPosition)
@@ -98,7 +98,7 @@ class NjordReducerTest {
 
     @Test
     fun hunchReportLoaded_replacesReportAndClearsLoading() {
-        val report = NjordMockData.hunchReport.copy(signal = "BUY", confidence = "MEDIUM")
+        val report = ReducerFixtures.hunchReport.copy(signal = "BUY", confidence = "MEDIUM")
         val state = reduce(NjordUiState(hunchReportLoading = true), NjordAction.HunchReportLoaded(report))
 
         assertEquals(report, state.hunchReport)
@@ -176,7 +176,7 @@ class NjordReducerTest {
 
     @Test
     fun heartbeatLoaded_replacesRoutinesAndCounts() {
-        val routine = HeartbeatRoutine("VPN heartbeat", "Healthy", "1m ago", "20m", Tone.Success)
+        val routine = HeartbeatRoutine("VPN heartbeat", "Healthy", java.time.Instant.now().minusSeconds(60), "20m", Tone.Success, null, 1200)
         val state = reduce(
             NjordUiState(heartbeatLoading = true),
             NjordAction.HeartbeatLoaded(
@@ -217,7 +217,7 @@ class NjordReducerTest {
 
     @Test
     fun liveLoaded_replacesPositionsAnalyticsAndIncidents() {
-        val position = NjordMockData.livePositions.first()
+        val position = ReducerFixtures.livePositions.first()
         val analytics = LiveAnalyticsSnapshot(
             totalContribution = "+\$1.00",
             totalContributionTone = Tone.Success,
@@ -230,7 +230,7 @@ class NjordReducerTest {
             shortCount = 0,
             longPct = 0f
         )
-        val incident = NjordMockData.incidents.first()
+        val incident = ReducerFixtures.incidents.first()
         val state = reduce(
             NjordUiState(liveLoading = true),
             NjordAction.LiveLoaded(listOf(position), analytics, listOf(incident))
@@ -245,7 +245,7 @@ class NjordReducerTest {
 
     @Test
     fun liveError_setsErrorTrueAndKeepsCachedLiveData() {
-        val position = NjordMockData.livePositions.first()
+        val position = ReducerFixtures.livePositions.first()
         val initial = NjordUiState(liveLoading = true, livePositions = listOf(position))
         val state = reduce(initial, NjordAction.LiveError)
 
@@ -253,4 +253,100 @@ class NjordReducerTest {
         assertTrue(state.liveError)
         assertFalse(state.liveLoading)
     }
+}
+
+private object ReducerFixtures {
+    val livePositions = listOf(
+        LivePosition(
+            id = "hype-long",
+            symbol = "HYPE",
+            side = "Long",
+            strategy = StrategyFilter.BigBang,
+            strategyName = "Big Bang",
+            opened = "10h",
+            pnl = "+$186",
+            pct = "+8.4%",
+            size = "53.8 HYPE",
+            capital = "$2.2k",
+            entry = "$41.20",
+            current = "$44.66",
+            trendUp = true
+        ),
+        LivePosition(
+            id = "arb-short",
+            symbol = "ARB",
+            side = "Short",
+            strategy = StrategyFilter.Wcr,
+            strategyName = "WCR",
+            opened = "22h",
+            pnl = "-$31",
+            pct = "-2.2%",
+            size = "1,050 ARB",
+            capital = "$1.1k",
+            entry = "$1.02",
+            current = "$1.04",
+            trendUp = false
+        )
+    )
+
+    val logs = listOf(
+        LogEntry(
+            level = LogFilter.Error,
+            strategy = StrategyFilter.BigBang,
+            title = "Big Bang open failed",
+            message = "Exchange rejected order: insufficient margin",
+            time = "13:52",
+            searchText = "Big Bang error open insufficient margin"
+        ),
+        LogEntry(
+            level = LogFilter.Error,
+            strategy = StrategyFilter.Wcr,
+            title = "WCR close failed",
+            message = "Hyperliquid rejected order: insufficient margin after retry",
+            time = "13:48",
+            searchText = "WCR error close insufficient margin"
+        ),
+        LogEntry(
+            level = LogFilter.Warn,
+            strategy = StrategyFilter.All,
+            title = "Weekly performance heartbeat late",
+            message = "Expected cadence missed",
+            time = "13:34",
+            searchText = "weekly report warning late"
+        )
+    )
+
+    val incidents = listOf(
+        Incident(
+            id = "eth-open-failed",
+            title = "ETH open failed",
+            subtitle = "Big Bang / Long",
+            current = "Rejected",
+            threshold = "Margin",
+            detail = "Open order was rejected because available margin was insufficient.",
+            badge = "Error",
+            tone = Tone.Danger,
+            age = "8m",
+            reason = "Margin"
+        )
+    )
+
+    val hunchReport = HunchReport(
+        title = "Hunch BTC Signal",
+        persistedAge = "Persisted 18m ago",
+        signal = "SELL",
+        signalTone = Tone.Danger,
+        confidence = "HIGH",
+        score = "-0.523",
+        date = "2026-06-07",
+        btcPriceAtSignal = "$62,215.00",
+        currentBtcPrice = "$63,193.50",
+        priceDelta = "+1.57%",
+        priceDeltaTone = Tone.Success,
+        wasSignalCorrect = "NO",
+        wasSignalCorrectTone = Tone.Danger,
+        keyFactors = listOf(ReportFactor("ETF flow weakness reduced upside conviction.")),
+        risks = listOf(ReportFactor("BTC strength can invalidate the short-term bias.", isRisk = true)),
+        layerScores = listOf(LayerScore("ETF flows", "-1.00", Tone.Danger))
+    )
 }

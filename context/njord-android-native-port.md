@@ -29,7 +29,7 @@ prototype.
 - Refined the More Activity screen against the June 10, 2026 native screenshot.
   Activity now presents the candle-close summary, compact non-wrapping action
   chips, grouped strategy action panels, and reference-matched bottom navigation
-  icons while still reading from `NjordMockData`.
+  icons.
 - Refined the More screen against the June 10, 2026 grouped-list screenshot.
   More now omits the page header and subtitles, presents Activity, Reports,
   Heartbeat, and Logs in one inset rounded list with muted icons, and preserves
@@ -52,13 +52,10 @@ prototype.
 
 ## Static Data Boundary
 
-The app now uses a hybrid data boundary. Static prototype-only surfaces still
-come from `NjordMockData`, while Home, Activity, Heartbeat, Logs, and Reports
-are API-backed and offline-first. Screen state remains local Compose state
-reduced through `NjordAction` and `reduce`.
+The app now uses API-backed, offline-first view snapshots. Screen state remains
+local Compose state reduced through `NjordAction` and `reduce`.
 
-Future API integration should replace `NjordMockData` with a repository-backed
-state source while preserving:
+Future repository work should preserve:
 
 - `Destination`
 - filter enums

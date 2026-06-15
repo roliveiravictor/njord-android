@@ -19,7 +19,7 @@ data class HeartbeatSnapshot(
     val routines: List<HeartbeatRoutine>
 )
 
-internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Instant.now()): HeartbeatSnapshot =
+internal fun mapApiHeartbeat(result: HeartbeatResult.Success): HeartbeatSnapshot =
     HeartbeatSnapshot(
         healthyCount = result.healthyCount,
         lateCount = result.lateCount,
@@ -31,9 +31,11 @@ internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Ins
                 HeartbeatRoutine(
                     name = service.toRoutineName(),
                     status = service.status.toHeartbeatLabel(),
-                    age = service.lastSeenAt.toAgeLabel(now),
+                    lastSeenAt = service.lastSeenAt?.toInstantOrNull(),
                     cadence = service.expectedCadenceSeconds.toCadenceLabel(),
-                    tone = service.status.toHeartbeatTone()
+                    tone = service.status.toHeartbeatTone(),
+                    secondsOverdue = service.secondsOverdue,
+                    expectedCadenceSeconds = service.expectedCadenceSeconds
                 )
             }
     )
@@ -66,9 +68,12 @@ private fun String.toHeartbeatTone(): Tone =
         else -> Tone.Muted
     }
 
-private fun String?.toAgeLabel(now: Instant): String {
-    val lastSeen = this?.toInstantOrNull() ?: return "Never"
-    val seconds = Duration.between(lastSeen, now).seconds.coerceAtLeast(0)
+internal fun toAgeLabel(secondsOverdue: Int?, expectedCadenceSeconds: Int, lastSeenAt: Instant?): String {
+    val seconds = when {
+        secondsOverdue != null -> (expectedCadenceSeconds + secondsOverdue).toLong().coerceAtLeast(0)
+        lastSeenAt != null -> Duration.between(lastSeenAt, Instant.now()).seconds.coerceAtLeast(0)
+        else -> return "Never"
+    }
     return when {
         seconds < 60 -> "just now"
         seconds < 3_600 -> "${seconds / 60}m ago"

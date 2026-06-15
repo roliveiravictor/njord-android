@@ -51,9 +51,11 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
     val totalPnl = summary?.totalUnrealizedPnl
         ?: analytics.strategyContributions.sumOf { it.unrealizedPnl }
     val integrity = analytics.integrity
-    val positionCount = summary?.positionCount ?: positions.size
-    val cexPositionCount = integrity?.unclaimed ?: positionCount
-    val integrityMismatchCount = abs(positionCount - cexPositionCount) + (integrity?.duplicate ?: 0)
+    val localPositionCount = positions.size
+    val positionCount = summary?.positionCount ?: localPositionCount
+    // Compare our actual positions against what the API summary says for this scope.
+    // integrity.unclaimed is a global CEX count and should not be used when strategy-filtered.
+    val integrityMismatchCount = abs(localPositionCount - positionCount) + (integrity?.duplicate ?: 0)
     return LiveAnalyticsSnapshot(
         totalContribution = formatSignedCurrency(totalPnl),
         totalContributionTone = toneFor(totalPnl),
@@ -66,9 +68,9 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             )
         },
         summaryItems = listOf(
-            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Leveraged capital", Tone.Muted),
-            MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted),
-            MiniKpi("INTEGRITY", "$positionCount/$cexPositionCount", "Cache vs. CEX", integrityTone(integrityMismatchCount))
+            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "", Tone.Muted),
+            MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "", Tone.Muted),
+            MiniKpi("INTEGRITY", "$localPositionCount/$positionCount", "", integrityTone(integrityMismatchCount))
         ),
         largestWinner = analytics.liveMetrics?.largestWinner?.let(::mapLiveOutcome),
         largestLoser = analytics.liveMetrics?.largestLoser?.let(::mapLiveOutcome),

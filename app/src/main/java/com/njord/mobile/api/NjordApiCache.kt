@@ -1,6 +1,9 @@
 package com.njord.mobile.api
 
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 enum class ApiCacheKey(val fileName: String) {
     Home("home.json"),
@@ -21,6 +24,7 @@ enum class ApiCacheKey(val fileName: String) {
 
 object NjordApiCache {
     private const val CacheDirectoryName = "api-cache"
+    private const val DefaultMaxAgeMillis = 5 * 60 * 1000L
 
     fun read(filesDir: File, key: ApiCacheKey): String? =
         runCatching {
@@ -29,11 +33,25 @@ object NjordApiCache {
             file.readText()
         }.getOrNull()
 
+    fun readFresh(filesDir: File, key: ApiCacheKey, maxAgeMillis: Long = DefaultMaxAgeMillis): String? =
+        runCatching {
+            val file = fileFor(filesDir, key)
+            if (!file.exists()) return@runCatching null
+            val ageMillis = System.currentTimeMillis() - file.lastModified()
+            if (ageMillis > maxAgeMillis) {
+                delete(filesDir, key)
+                return@runCatching null
+            }
+            file.readText()
+        }.getOrNull()
+
     fun write(filesDir: File, key: ApiCacheKey, body: String): Boolean =
         runCatching {
             val file = fileFor(filesDir, key)
             file.parentFile?.mkdirs()
-            file.writeText(body)
+            val tempFile = File(file.parentFile, "${file.name}.tmp")
+            tempFile.writeText(body)
+            moveAtomically(tempFile, file)
             true
         }.getOrDefault(false)
 
@@ -45,4 +63,17 @@ object NjordApiCache {
 
     fun fileFor(filesDir: File, key: ApiCacheKey): File =
         File(File(filesDir, CacheDirectoryName), key.fileName)
+
+    private fun moveAtomically(source: File, target: File) {
+        try {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
 }

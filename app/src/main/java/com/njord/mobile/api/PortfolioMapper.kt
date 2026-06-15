@@ -21,13 +21,18 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
     val averagePnl = response.monthlyStats.averageMonthlyPnl
         ?: response.monthlyReturns.takeIf { it.isNotEmpty() }?.map { it.pnlPct }?.average()
 
+    val intradayPnl = response.liveMetrics.realizedPnl + response.liveMetrics.unrealizedPnl
+    val todayPnlValue = response.performanceStrip.todayPnl ?: intradayPnl
+    val todayPnlKnown = response.performanceStrip.todayPnl != null
+
     return PortfolioSnapshot(
         totalEquity = formatCompactCurrency(response.totalEquity),
         returnBadge = "ALL ${formatSignedPercent(response.allTimeReturnPct)}",
         returnTone = toneFor(response.allTimeReturnPct),
-        todayPnl = response.performanceStrip.todayPnl?.let(::formatSignedCurrency) ?: "N/A",
-        todayPct = response.performanceStrip.todayPnlPct?.let(::formatSignedPercent) ?: "No baseline",
-        todayTone = toneFor(response.performanceStrip.todayPnl ?: 0.0),
+        todayPnl = formatSignedCurrency(todayPnlValue),
+        todayPct = response.performanceStrip.todayPnlPct?.let(::formatSignedPercent)
+            ?: if (todayPnlKnown) "No baseline" else "Intraday",
+        todayTone = toneFor(todayPnlValue),
         sevenDayPnl = response.performanceStrip.sevenDayPnl?.let(::formatSignedCurrency) ?: "N/A",
         sevenDayPct = response.performanceStrip.sevenDayPnlPct?.let(::formatSignedPercent) ?: "No baseline",
         sevenDayTone = toneFor(response.performanceStrip.sevenDayPnl ?: 0.0),

@@ -235,6 +235,50 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun parseHomeResponse_missingLatestCycleCount_returnsError() {
+        val json = """
+            {
+              "strategies": [],
+              "latest_cycle": {
+                "timestamp": "2026-06-15T00:06:06.182041+00:00",
+                "opened_count": 7,
+                "kept_count": 1
+              },
+              "heartbeat": {
+                "healthy": 8,
+                "total": 8,
+                "late_count": 0
+              }
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHomeResponse(json)
+
+        assertTrue(result is HomeResult.Error)
+    }
+
+    @Test
+    fun parseActivityResponse_missingCycleTotals_returnsError() {
+        val json = """
+            {
+              "cycles": [
+                {
+                  "timestamp": "2026-06-15T00:06:06.182041+00:00",
+                  "cycle_status": "complete",
+                  "total_opened": 7,
+                  "total_kept": 1,
+                  "strategies": []
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseActivityResponse(json)
+
+        assertTrue(result is ActivityResult.Error)
+    }
+
+    @Test
     fun parsePortfolioResponse_wellFormedJson_returnsSuccessWithMetrics() {
         val json = """
             {
@@ -949,7 +993,7 @@ class NjordApiClientTest {
             )
         )
 
-        val snapshot = mapApiHeartbeat(apiResult, now = Instant.parse("2026-06-12T14:23:00Z"))
+        val snapshot = mapApiHeartbeat(apiResult)
 
         assertEquals(7, snapshot.healthyCount)
         assertEquals(1, snapshot.lateCount)
@@ -957,11 +1001,11 @@ class NjordApiClientTest {
         assertEquals(8, snapshot.totalCount)
         assertEquals("VPN", snapshot.routines[0].name)
         assertEquals("Healthy", snapshot.routines[0].status)
-        assertEquals("3m ago", snapshot.routines[0].age)
+        assertEquals(Instant.parse("2026-06-12T14:20:00Z"), snapshot.routines[0].lastSeenAt)
         assertEquals("20m", snapshot.routines[0].cadence)
         assertEquals("Database", snapshot.routines[1].name)
         assertEquals("Unknown", snapshot.routines[1].status)
-        assertEquals("Never", snapshot.routines[1].age)
+        assertEquals(null, snapshot.routines[1].lastSeenAt)
         assertEquals("Late", snapshot.routines[2].status)
         assertEquals("7d", snapshot.routines[2].cadence)
     }

@@ -20,6 +20,30 @@ class NjordApiCacheTest {
         assertTrue(NjordApiCache.write(filesDir, ApiCacheKey.Home, body))
 
         assertEquals(body, NjordApiCache.read(filesDir, ApiCacheKey.Home))
+        assertFalse(NjordApiCache.fileFor(filesDir, ApiCacheKey.Home).resolveSibling("home.json.tmp").exists())
+    }
+
+    @Test
+    fun readFresh_recentFile_returnsOriginalJson() {
+        val filesDir = temporaryFolder.newFolder("files")
+        val body = """{"cycles":[]}"""
+
+        assertTrue(NjordApiCache.write(filesDir, ApiCacheKey.Activity, body))
+
+        assertEquals(body, NjordApiCache.readFresh(filesDir, ApiCacheKey.Activity))
+    }
+
+    @Test
+    fun readFresh_staleFileReturnsNullAndDeletesCache() {
+        val filesDir = temporaryFolder.newFolder("files")
+        val body = """{"cycles":[]}"""
+
+        assertTrue(NjordApiCache.write(filesDir, ApiCacheKey.Activity, body))
+        val file = NjordApiCache.fileFor(filesDir, ApiCacheKey.Activity)
+        assertTrue(file.setLastModified(System.currentTimeMillis() - 10 * 60 * 1000L))
+
+        assertNull(NjordApiCache.readFresh(filesDir, ApiCacheKey.Activity))
+        assertFalse(file.exists())
     }
 
     @Test

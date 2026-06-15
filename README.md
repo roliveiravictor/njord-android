@@ -8,15 +8,16 @@ Native Android implementation of the Njord mobile dashboard.
 
 Every screen that fetches remote data follows a strict offline-first pattern:
 
-1. **Cache read first** — on composition, the screen immediately reads the last
-   persisted JSON payload from `NjordApiCache` and renders it. The user sees
-   real (possibly stale) data instantly, with no blank loading state.
+1. **Fresh cache read first** — on composition, the screen immediately reads
+   the last recent JSON payload from `NjordApiCache` and renders it. Endpoint
+   snapshots older than the freshness window are discarded before rendering.
 2. **Live fetch overlays** — a background IO coroutine then fetches the live
    API response. On success the UI re-renders with fresh data and the new
-   payload is written back to cache. On failure the cached data stays on screen.
+   payload is written back to cache. On failure, only a fresh cached payload
+   stays on screen.
 3. **Cache write-through** — only a successful, parseable API response is
-   written to cache. A parse error deletes the stale cache entry to prevent
-   the app from repeatedly loading bad data.
+   written to cache. Writes replace the previous file atomically, and parse
+   errors delete invalid cache entries to prevent repeated bad renders.
 
 The cache is file-based (`NjordApiCache`, stored in `filesDir/api-cache/`). Each
 endpoint has a dedicated `ApiCacheKey` enum entry and a corresponding JSON file.
