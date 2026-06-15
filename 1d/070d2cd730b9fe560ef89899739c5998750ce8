@@ -1,0 +1,31 @@
+context/njord-android-native-port.md
+  s_0f31e614e04cdb::t_6b81e1f00ca788 32,55-56,58
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_0f31e614e04cdb::t_f721c75bd020bb 418-420,457-459,816-819
+app/src/main/java/com/njord/mobile/api/NjordApiCache.kt
+  s_0f31e614e04cdb::t_942a77d83ac6b6 4-6,27,36-47,52-54,66-78
+README.md
+  s_0f31e614e04cdb::t_5d3901879d0a38 11-13,16-17,19-20
+app/src/test/java/com/njord/mobile/api/NjordApiCacheTest.kt
+  s_0f31e614e04cdb::t_709e9df0138ebb 23-46
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_0f31e614e04cdb::t_6b81e1f00ca788 21,33,46,58,101,179,220,233,248,257-351
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_0f31e614e04cdb::t_709e9df0138ebb 238-280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "1d070d2cd730b9fe560ef89899739c5998750ce8",
+  "prompts": {},
+  "sessions": {
+    "s_0f31e614e04cdb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eccfd-aa24-7da0-9091-f32c8c159ee2",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
