@@ -1,0 +1,30 @@
+app/src/main/java/com/njord/mobile/api/LiveMapper.kt
+  s_712737acc14d32::t_4033af95fa02f3 68,74-76
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_712737acc14d32::t_4033af95fa02f3 1875,1878,1936,1962,1988,1991-1992,2009,2012-2014
+  s_0a0d11cd43486e::t_13d3aca703cbe7 1760-1763
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "74efaabcc185fc958f438b604f9bcd4d07bf01dc",
+  "prompts": {},
+  "sessions": {
+    "s_0a0d11cd43486e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec8f5-9ab5-7220-9be9-e34b6b2f7d37",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_712737acc14d32": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ec8f6-ac35-7fa0-aee2-d04772a182ce",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
