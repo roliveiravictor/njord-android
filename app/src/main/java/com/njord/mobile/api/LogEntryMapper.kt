@@ -23,7 +23,7 @@ internal fun mapApiEntries(entries: List<LogApiEntry>): List<LogEntry> =
             ?: entry.strategyName
             ?: entryStrategy?.label
             ?: strategy.takeUnless { it == StrategyFilter.All }?.label
-            ?: entry.title.ifBlank { "Log entry" }
+            ?: entry.title.ifBlank { "System" }
         LogEntry(
             level = when (entry.level) {
                 "WARNING" -> LogFilter.Warn

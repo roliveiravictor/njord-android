@@ -47,6 +47,23 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun apiErrorMessage_prefersApiMessageField() {
+        val message = NjordApiClient.apiErrorMessage(
+            """{"message":"API key is invalid","detail":"not this"}""",
+            "HTTP 401"
+        )
+
+        assertEquals("API key is invalid", message)
+    }
+
+    @Test
+    fun apiErrorMessage_usesFallbackForBlankBody() {
+        val message = NjordApiClient.apiErrorMessage("", "HTTP 500")
+
+        assertEquals("HTTP 500", message)
+    }
+
+    @Test
     fun parseLogsResponse_wellFormedJson_returnsSuccessWithEntries() {
         val json = makeValidJson(
             makeEntry("INFO", "hyperliquid.wcr", "Rebalance complete", "2026-06-12T14:23:01"),
@@ -144,7 +161,7 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun parseHomeResponse_wellFormedJson_returnsSuccessWithoutMappingIncidents() {
+    fun parseHomeResponse_wellFormedJson_returnsSuccessWithIncidents() {
         val json = """
             {
               "total_balance": 18420.0,
@@ -198,6 +215,9 @@ class NjordApiClientTest {
         assertEquals(2, response.latestCycle?.openedCount)
         assertEquals(7, response.heartbeat.healthy)
         assertEquals(8, response.heartbeat.total)
+        assertEquals(1, response.incidents.size)
+        assertEquals("Remote incident", response.incidents[0].title)
+        assertEquals("order", response.incidents[0].category)
     }
 
     @Test
@@ -386,10 +406,21 @@ class NjordApiClientTest {
                 closedCount = 1,
                 keptCount = 15
             ),
-            heartbeat = HomeApiHeartbeat(healthy = 7, total = 8, lateCount = 1)
+            heartbeat = HomeApiHeartbeat(healthy = 7, total = 8, lateCount = 1),
+            incidents = listOf(
+                LiveApiIncident(
+                    timestamp = "2026-06-14T20:24:02Z",
+                    level = "ERROR",
+                    category = "safety_abort",
+                    title = "WCR safety abort",
+                    message = "Positions remain after safety close",
+                    strategy = "wcr",
+                    symbol = null
+                )
+            )
         )
 
-        val snapshot = mapApiHome(response)
+        val snapshot = mapApiHome(response, now = Instant.parse("2026-06-14T20:29:02Z"))
 
         assertEquals("\$18,420.00", snapshot.totalBalance)
         assertEquals("-\$428.00", snapshot.unrealizedPnl)
@@ -402,6 +433,8 @@ class NjordApiClientTest {
         assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
         assertEquals("+\$184.00", snapshot.strategies[0].pnl)
         assertEquals("+2.6%", snapshot.strategies[0].pct)
+        assertEquals("WCR", snapshot.incidents.single().subtitle)
+        assertEquals("5m", snapshot.incidents.single().age)
     }
 
     @Test
@@ -516,7 +549,7 @@ class NjordApiClientTest {
         assertEquals("170.61 ATOM", positions[0].size)
         assertEquals("-\$3.38", analytics?.totalContribution)
         assertEquals("Big Bang", analytics?.strategyContributions?.single()?.strategy)
-        assertEquals("2d", analytics?.summaryItems?.get(2)?.value)
+        assertEquals("2d", analytics?.summaryItems?.get(1)?.value)
         assertEquals("INTEGRITY", analytics?.summaryItems?.last()?.label)
         assertEquals("1/1", analytics?.summaryItems?.last()?.value)
         assertEquals("Cache vs. CEX", analytics?.summaryItems?.last()?.subtext)

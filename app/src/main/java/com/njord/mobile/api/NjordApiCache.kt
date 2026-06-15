@@ -12,7 +12,8 @@ enum class ApiCacheKey(val fileName: String) {
     PortfolioHunch("portfolio-hunch.json"),
     Logs("logs.json"),
     Heartbeat("heartbeat.json"),
-    HunchReport("hunch-report-latest.json")
+    HunchReport("hunch-report-latest.json"),
+    Incidents("incidents.json")
 }
 
 object NjordApiCache {

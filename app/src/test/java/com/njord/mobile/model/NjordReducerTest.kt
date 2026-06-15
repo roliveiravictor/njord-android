@@ -45,11 +45,11 @@ class NjordReducerTest {
     fun dismissIncident_hidesIncidentBanner() {
         val incident = NjordMockData.incidents.first()
         val state = reduce(
-            NjordUiState(selectedIncident = incident),
+            NjordUiState(selectedIncident = incident, liveIncidents = listOf(incident)),
             NjordAction.DismissIncident(incident.id)
         )
 
-        assertTrue(incident.id in state.dismissedIncidentIds)
+        assertFalse(state.liveIncidents.any { it.id == incident.id })
         assertNull(state.selectedIncident)
     }
 

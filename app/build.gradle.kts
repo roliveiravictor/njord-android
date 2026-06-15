@@ -43,6 +43,12 @@ android {
             buildConfigField("String", "NJORD_API_BASE_URL", debugApiBaseUrl.get().asBuildConfigString())
         }
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "NJORD_API_BASE_URL", releaseApiBaseUrl.get().asBuildConfigString())
         }
@@ -66,6 +72,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material.icons)

@@ -4,12 +4,13 @@ import com.njord.mobile.model.ActivitySummary
 import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.StrategySummary
 import java.text.NumberFormat
+import java.time.Instant
 import java.util.Locale
 import kotlin.math.abs
 
 private val USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US)
 
-internal fun mapApiHome(response: HomeApiResponse): HomeSnapshot =
+internal fun mapApiHome(response: HomeApiResponse, now: Instant = Instant.now()): HomeSnapshot =
     HomeSnapshot(
         totalBalance = USD_FORMATTER.format(response.totalBalance),
         unrealizedPnl = formatSignedCurrency(response.unrealizedPnl),
@@ -28,7 +29,10 @@ internal fun mapApiHome(response: HomeApiResponse): HomeSnapshot =
         },
         heartbeatHealthy = response.heartbeat.healthy,
         heartbeatTotal = response.heartbeat.total,
-        heartbeatLateCount = response.heartbeat.lateCount
+        heartbeatLateCount = response.heartbeat.lateCount,
+        incidents = response.incidents.mapIndexed { index, incident ->
+            mapApiIncident(incident, index, now)
+        }
     )
 
 private fun mapHomeStrategy(strategy: HomeApiStrategy): StrategySummary =

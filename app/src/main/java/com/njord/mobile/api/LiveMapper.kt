@@ -2,6 +2,7 @@ package com.njord.mobile.api
 
 import com.njord.mobile.model.Incident
 import com.njord.mobile.model.LiveAnalyticsSnapshot
+import org.json.JSONArray
 import com.njord.mobile.model.LiveContribution
 import com.njord.mobile.model.LiveOutcome
 import com.njord.mobile.model.LivePosition
@@ -22,7 +23,7 @@ private val USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US)
 internal fun mapApiLive(response: LiveApiResponse, now: Instant = Instant.now()): Triple<List<LivePosition>, LiveAnalyticsSnapshot?, List<Incident>> {
     val positions = response.positions.map(::mapLivePosition)
     val analytics = response.analytics?.let { mapLiveAnalytics(it, positions) }
-    val incidents = response.incidents.mapIndexed { index, incident -> mapLiveIncident(incident, index, now) }
+    val incidents = response.incidents.mapIndexed { index, incident -> mapApiIncident(incident, index, now) }
     return Triple(positions, analytics, incidents)
 }
 
@@ -65,10 +66,8 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             )
         },
         summaryItems = listOf(
-            MiniKpi("OPEN P&L", formatSignedCurrency(totalPnl), "All strategies", toneFor(totalPnl)),
             MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Displayed filter", Tone.Muted),
             MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "Current cycle", Tone.Muted),
-            MiniKpi("POSITIONS", positionCount.toString(), "Current open", Tone.Primary),
             MiniKpi("LONG", (summary?.longCount ?: positions.count { it.side.equals("Long", ignoreCase = true) }).toString(), "${formatPercent(summary?.longPct ?: ratio(positions.count { it.side.equals("Long", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("SHORT", (summary?.shortCount ?: positions.count { it.side.equals("Short", ignoreCase = true) }).toString(), "${formatPercent(summary?.shortPct ?: ratio(positions.count { it.side.equals("Short", ignoreCase = true) }, positions.size))} of book", Tone.Muted),
             MiniKpi("INTEGRITY", "$positionCount/$cexPositionCount", "Cache vs. CEX", integrityTone(integrityMismatchCount))
@@ -91,12 +90,12 @@ private fun mapLiveOutcome(position: LiveApiPosition): LiveOutcome =
         tone = toneFor(position.unrealizedPnl)
     )
 
-private fun mapLiveIncident(incident: LiveApiIncident, index: Int, now: Instant): Incident {
+internal fun mapApiIncident(incident: LiveApiIncident, index: Int, now: Instant = Instant.now()): Incident {
     val tone = incident.level.toIncidentTone()
     val strategy = incident.strategy?.toStrategyName().orEmpty()
     val symbol = incident.symbol?.let(::formatSymbol).orEmpty()
     return Incident(
-        id = "${incident.timestamp}-${incident.category}-${index}".ifBlank { "live-incident-$index" },
+        id = "${incident.timestamp}-${incident.category}".ifBlank { "incident-$index" },
         title = incident.title.ifBlank { incident.category.toDisplayLabel() },
         subtitle = listOf(strategy, symbol).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { incident.category.toDisplayLabel() },
         current = incident.level.ifBlank { "Event" }.toDisplayLabel(),
@@ -108,6 +107,16 @@ private fun mapLiveIncident(incident: LiveApiIncident, index: Int, now: Instant)
         reason = incident.category.toDisplayLabel()
     )
 }
+
+internal fun parseIncidentsFromJson(json: String, now: Instant = Instant.now()): List<Incident> =
+    try {
+        val arr = JSONArray(json)
+        (0 until arr.length()).mapIndexed { index, i ->
+            arr.optJSONObject(i)
+                ?.let { NjordApiClient.parseLiveIncident(it) }
+                ?.let { mapApiIncident(it, index, now) }
+        }.filterNotNull()
+    } catch (_: Exception) { emptyList() }
 
 private fun String.toStrategyFilter(): StrategyFilter =
     when (lowercase()) {

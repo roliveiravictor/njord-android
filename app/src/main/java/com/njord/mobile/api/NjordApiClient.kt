@@ -1,6 +1,7 @@
 package com.njord.mobile.api
 
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -98,7 +99,8 @@ data class HomeApiResponse(
     val unrealizedPnlPct: Double,
     val strategies: List<HomeApiStrategy>,
     val latestCycle: HomeApiCycle?,
-    val heartbeat: HomeApiHeartbeat
+    val heartbeat: HomeApiHeartbeat,
+    val incidents: List<LiveApiIncident>
 )
 
 data class PortfolioPerformanceStripApiResponse(
@@ -272,8 +274,8 @@ sealed interface HunchReportResult {
 }
 
 sealed interface ApiPayloadResult {
-    data class Success(val body: String) : ApiPayloadResult
-    data class Error(val message: String) : ApiPayloadResult
+    data class Success(val body: String, val statusCode: Int, val path: String) : ApiPayloadResult
+    data class Error(val statusCode: Int?, val path: String, val message: String) : ApiPayloadResult
 }
 
 object NjordApiClient {
@@ -350,21 +352,33 @@ object NjordApiClient {
 
     private fun fetchPayload(url: String, apiKey: String, operation: String): ApiPayloadResult {
         Log.d("NjordApi", "$operation url=$url")
+        val path = URL(url).file
         val connection = openConnection(url, apiKey)
         return try {
             val code = connection.responseCode
             Log.d("NjordApi", "$operation responseCode=$code")
             if (code !in 200..299) {
-                return ApiPayloadResult.Error("HTTP $code")
+                val body = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                return ApiPayloadResult.Error(code, path, apiErrorMessage(body, "HTTP $code"))
             }
             val body = connection.inputStream.bufferedReader().use { it.readText() }
             Log.d("NjordApi", "$operation body=$body")
-            ApiPayloadResult.Success(body)
+            ApiPayloadResult.Success(body, code, path)
         } catch (e: Exception) {
             Log.e("NjordApi", "$operation error: ${e.javaClass.simpleName}: ${e.message}", e)
-            ApiPayloadResult.Error(e.message ?: "Unknown error")
+            ApiPayloadResult.Error(null, path, (e.message ?: "Unknown error").take(200))
         } finally {
             connection.disconnect()
+        }
+    }
+
+    internal fun apiErrorMessage(body: String, fallback: String): String {
+        if (body.isBlank()) return fallback
+        return try {
+            val root = JSONObject(body)
+            root.firstOptionalString("message", "detail", "error", "title") ?: body.take(240)
+        } catch (_: Exception) {
+            body.take(240)
         }
     }
 
@@ -376,6 +390,7 @@ object NjordApiClient {
             val heartbeatObject = root.optJSONObject("heartbeat")
                 ?: return HomeResult.Error("Missing 'heartbeat' key")
             val latestCycleObject = root.optJSONObject("latest_cycle")
+            val incidentsArray = root.optJSONArray("incidents")
             val strategies = (0 until strategiesArray.length()).mapNotNull { i ->
                 val obj = strategiesArray.optJSONObject(i) ?: return@mapNotNull null
                 HomeApiStrategy(
@@ -409,7 +424,10 @@ object NjordApiClient {
                         healthy = heartbeatObject.optInt("healthy", 0),
                         total = heartbeatObject.optInt("total", 0),
                         lateCount = heartbeatObject.optInt("late_count", 0)
-                    )
+                    ),
+                    incidents = (0 until (incidentsArray?.length() ?: 0)).mapNotNull { i ->
+                        incidentsArray?.optJSONObject(i)?.let(::parseLiveIncident)
+                    }
                 )
             )
         } catch (e: Exception) {
@@ -581,7 +599,7 @@ object NjordApiClient {
         )
     }
 
-    private fun parseLiveIncident(obj: JSONObject): LiveApiIncident =
+    internal fun parseLiveIncident(obj: JSONObject): LiveApiIncident =
         LiveApiIncident(
             timestamp = obj.optString("timestamp", ""),
             level = obj.optString("level", ""),
@@ -746,6 +764,41 @@ object NjordApiClient {
 
     internal fun portfolioUrl(baseUrl: String, strategy: String): String =
         "$baseUrl/v1/portfolio?strategy=$strategy"
+
+    internal fun extractIncidentsJson(body: String): String? =
+        try { JSONObject(body).optJSONArray("incidents")?.toString() } catch (_: Exception) { null }
+
+    internal fun mergeIncidentJson(existing: String?, incoming: String?): String {
+        if (incoming == null) return existing ?: "[]"
+        val result = JSONArray()
+        val seenKeys = mutableSetOf<String>()
+        fun addAll(json: String?) {
+            if (json == null) return
+            try {
+                val arr = JSONArray(json)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val key = "${obj.optString("timestamp")}-${obj.optString("category")}"
+                    if (seenKeys.add(key)) result.put(obj)
+                }
+            } catch (_: Exception) {}
+        }
+        addAll(existing)
+        addAll(incoming)
+        return result.toString()
+    }
+
+    internal fun deleteFromIncidentJson(existing: String, incidentId: String): String =
+        try {
+            val arr = JSONArray(existing)
+            val result = JSONArray()
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val key = "${obj.optString("timestamp")}-${obj.optString("category")}"
+                if (key != incidentId) result.put(obj)
+            }
+            result.toString()
+        } catch (_: Exception) { existing }
 }
 
 private fun JSONObject.optionalString(name: String): String? =
