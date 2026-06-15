@@ -1,0 +1,48 @@
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_c7c74f3989fa32::t_851514d5bf9586 371-373,379,383-391,403-408,449-459,462-475,478,1584-1590
+  s_c7c74f3989fa32::t_2e09f952ac2528 590-597,601-603,607-629,632,711,713-717,719,722,726-742
+  s_ac8031083ad467::t_9595085ecd91c3 2776,2784,2786,2794,2797,2811-2812,2816-2821,2823-2825,2831-2832,2836-2841,2843-2845
+  s_ac8031083ad467::t_371ea26b53b7b8 5,73,75-77,130,155,218-232,256-257,313-321,351,355,357-363
+  s_c7c74f3989fa32::t_23518177ceb488 799,801-805,807,819,823-848
+  s_c7c74f3989fa32::t_2c1c49f9cede2e 974-984,987-999,1002
+app/src/main/java/com/njord/mobile/api/LiveMapper.kt
+  s_c7c74f3989fa32::t_851514d5bf9586 26,93
+app/src/main/java/com/njord/mobile/api/HomeMapper.kt
+  s_c7c74f3989fa32::t_851514d5bf9586 13,32-35
+  s_c7c74f3989fa32::t_2279958af908f4 7
+app/src/main/java/com/njord/mobile/api/LogEntryMapper.kt
+  s_ac8031083ad467::t_b883b599e64fea 26
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_c7c74f3989fa32::t_851514d5bf9586 272-273
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_ac8031083ad467::t_f9a19b0b5799bb 277-278,355,361-362,366,375-381
+  s_c7c74f3989fa32::t_851514d5bf9586 102-103,393,427-430
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_c7c74f3989fa32::t_851514d5bf9586 164,218-220,410-420,423,436-437
+  s_c7c74f3989fa32::t_2279958af908f4 409
+  s_ac8031083ad467::t_d0d6ef83dcb9be 50-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "f41b4db86f1257a9754501df38d4f48576f67fc4",
+  "prompts": {},
+  "sessions": {
+    "s_ac8031083ad467": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecb26-c895-7483-9a1a-c39e3394a23e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_c7c74f3989fa32": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecb32-92e9-74c2-bae7-763a70a58e2d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
