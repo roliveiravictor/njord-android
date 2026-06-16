@@ -8,15 +8,13 @@ Native Android implementation of the Njord mobile dashboard.
 
 Every screen that fetches remote data follows a strict offline-first pattern:
 
-1. **Fresh cache read first** — on composition, the screen immediately reads
-   the last recent JSON payload from `NjordApiCache.readFresh` and renders it.
-   Payloads older than the freshness window (default 5 minutes) are discarded
-   and treated as a cache miss so stale values are never shown.
-2. **Live fetch overlays** — a background IO coroutine then fetches the live
-   API response. On success the UI re-renders with fresh data and the new
-   payload is written back to cache. On failure, only a fresh cached payload
-   stays on screen; a stale or missing cache leaves the screen in its loading
-   placeholder state.
+1. **Stale cache served immediately** — on composition, the screen reads the
+   last cached JSON payload from `NjordApiCache.read` and renders it right away,
+   giving users instant feedback even before the network responds.
+2. **Live fetch always runs** — a background IO coroutine fetches the live API
+   response unconditionally. On success the UI re-renders with fresh data and
+   the new payload is written back to cache, replacing the stale render.
+   On failure the stale cache stays visible and a toast is shown.
 3. **Cache write-through** — only a successful, parseable API response is
    written to cache. Writes replace the previous file atomically, and parse
    errors delete invalid cache entries to prevent repeated bad renders.
@@ -24,16 +22,28 @@ Every screen that fetches remote data follows a strict offline-first pattern:
 The cache is file-based (`NjordApiCache`, stored in `filesDir/api-cache/`). Each
 endpoint has a dedicated `ApiCacheKey` enum entry and a corresponding JSON file.
 
-**Important:** always use `NjordApiCache.readFresh` (not `read`) in load
-functions. `read` has no TTL and will return arbitrarily old data, causing the
-UI to show stale values (e.g. an outdated open-position count) until the network
-call completes — or indefinitely if it fails.
+### Lifecycle refresh
+
+`NjordDashboardScreen` uses two `LaunchedEffect` triggers to load data:
+
+- `LaunchedEffect(state.destination)` — fires whenever the user navigates to a
+  new screen, loading that screen's data.
+- `LaunchedEffect(lifecycleOwner)` — fires once on initial composition and then
+  again each time the app comes back to the foreground (RESUMED state). Uses
+  `rememberUpdatedState` for both `state` and `onAction` so the **current**
+  destination is always refreshed on resume, not the destination from initial
+  composition.
+
+**Important:** always use `rememberUpdatedState` when capturing `state` or
+`onAction` inside `LaunchedEffect(lifecycleOwner)`. Without it, a one-time
+effect captures those values at initial composition and never sees later
+navigation changes.
 
 ### Fetch pattern (canonical example from `loadPortfolioData`)
 
 ```kotlin
-// 1. Serve cache immediately — skips payloads older than 5 minutes
-NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { body ->
+// 1. Serve stale cache immediately for instant render
+NjordApiCache.read(context.filesDir, cacheKey)?.let { body ->
     when (val cached = NjordApiClient.parsePortfolioResponse(body)) {
         is PortfolioResult.Success ->
             dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
@@ -50,8 +60,8 @@ when (val result = NjordApiClient.fetchPortfolioPayload(...)) {
 }
 ```
 
-The `Incidents` cache is the only exception: it uses `read` (no TTL) because
-incidents accumulate across sessions until the user explicitly dismisses them.
+The `Incidents` cache is intentionally not cleared by a network refresh — it
+accumulates across sessions until the user explicitly dismisses each incident.
 
 ## Stack
 
