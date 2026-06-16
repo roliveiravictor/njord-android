@@ -412,7 +412,7 @@ private suspend fun showApiParseFailureToast(context: Context, payload: ApiPaylo
 }
 
 private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseHomeResponse(cachedBody)) {
             is HomeResult.Success -> {
                 val snapshot = mapApiHome(cached.response).copy(incidents = emptyList())
@@ -451,7 +451,7 @@ private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Un
 }
 
 private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Unit, strategy: String = "all", cacheKey: ApiCacheKey = ApiCacheKey.Live) {
-    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseLiveResponse(cachedBody)) {
             is LiveResult.Success -> {
                 val (cachedPositions, cachedAnalytics, _) = mapApiLive(cached.response)
@@ -492,7 +492,7 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
 
 
 private suspend fun loadPortfolioData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
-    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { cachedBody ->
         when (val cached = NjordApiClient.parsePortfolioResponse(cachedBody)) {
             is PortfolioResult.Success -> dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
             is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
@@ -519,7 +519,7 @@ private suspend fun loadPortfolioData(context: Context, onAction: (NjordAction) 
 }
 
 private suspend fun loadActivityData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseActivityResponse(cachedBody)) {
             is ActivityResult.Success -> {
                 val (summary, cycles) = mapApiActivity(cached.response)
@@ -549,7 +549,7 @@ private suspend fun loadActivityData(context: Context, onAction: (NjordAction) -
 }
 
 private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseHeartbeatResponse(cachedBody)) {
             is HeartbeatResult.Success -> {
                 val snapshot = mapApiHeartbeat(cached)
@@ -597,7 +597,7 @@ private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) 
 }
 
 private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseLogsResponse(cachedBody)) {
             is LogsResult.Success -> dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
             is LogsResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
@@ -623,7 +623,7 @@ private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Un
 }
 
 private suspend fun loadHunchReportData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
         when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
             is HunchReportResult.Success -> dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
             is HunchReportResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)

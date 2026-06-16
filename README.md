@@ -9,12 +9,14 @@ Native Android implementation of the Njord mobile dashboard.
 Every screen that fetches remote data follows a strict offline-first pattern:
 
 1. **Fresh cache read first** — on composition, the screen immediately reads
-   the last recent JSON payload from `NjordApiCache` and renders it. Endpoint
-   snapshots older than the freshness window are discarded before rendering.
+   the last recent JSON payload from `NjordApiCache.readFresh` and renders it.
+   Payloads older than the freshness window (default 5 minutes) are discarded
+   and treated as a cache miss so stale values are never shown.
 2. **Live fetch overlays** — a background IO coroutine then fetches the live
    API response. On success the UI re-renders with fresh data and the new
    payload is written back to cache. On failure, only a fresh cached payload
-   stays on screen.
+   stays on screen; a stale or missing cache leaves the screen in its loading
+   placeholder state.
 3. **Cache write-through** — only a successful, parseable API response is
    written to cache. Writes replace the previous file atomically, and parse
    errors delete invalid cache entries to prevent repeated bad renders.
@@ -22,32 +24,34 @@ Every screen that fetches remote data follows a strict offline-first pattern:
 The cache is file-based (`NjordApiCache`, stored in `filesDir/api-cache/`). Each
 endpoint has a dedicated `ApiCacheKey` enum entry and a corresponding JSON file.
 
-### Fetch pattern (canonical example from `PortfolioScreen`)
+**Important:** always use `NjordApiCache.readFresh` (not `read`) in load
+functions. `read` has no TTL and will return arbitrarily old data, causing the
+UI to show stale values (e.g. an outdated open-position count) until the network
+call completes — or indefinitely if it fails.
+
+### Fetch pattern (canonical example from `loadPortfolioData`)
 
 ```kotlin
-LaunchedEffect(strategy) {
-    withContext(Dispatchers.IO) {
-        // 1. Serve cache immediately
-        NjordApiCache.read(filesDir, cacheKey)?.let { body ->
-            NjordApiClient.parsePortfolioResponse(body).let { result ->
-                if (result is PortfolioResult.Success)
-                    dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(result.response)))
-                else
-                    NjordApiCache.delete(filesDir, cacheKey)
-            }
-        }
-        // 2. Fetch live
-        dispatchUiAction(onAction, NjordAction.PortfolioLoading)
-        when (val result = NjordApiClient.fetchPortfolioPayload(...)) {
-            is ApiPayloadResult.Success -> { /* parse → write cache → PortfolioLoaded */ }
-            is ApiPayloadResult.Error  -> dispatchUiAction(onAction, NjordAction.PortfolioError)
-        }
+// 1. Serve cache immediately — skips payloads older than 5 minutes
+NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { body ->
+    when (val cached = NjordApiClient.parsePortfolioResponse(body)) {
+        is PortfolioResult.Success ->
+            dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
+        is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
+        else -> {}
     }
+}
+// 2. Always fetch live; result overwrites the in-memory snapshot
+when (val result = NjordApiClient.fetchPortfolioPayload(...)) {
+    is ApiPayloadResult.Success -> {
+        // parse → write cache → PortfolioLoaded
+    }
+    is ApiPayloadResult.Error -> showApiFailureToast(context, result)
 }
 ```
 
-All screens must follow this pattern. Skipping the loading or error dispatch
-leaves the UI in an indeterminate state and is a bug.
+The `Incidents` cache is the only exception: it uses `read` (no TTL) because
+incidents accumulate across sessions until the user explicitly dismisses them.
 
 ## Stack
 
@@ -82,7 +86,6 @@ download Gradle and AndroidX dependencies.
 - Home
 - Portfolio
 - Live
-- Risk
 - More
 - Activity
 - Heartbeat
