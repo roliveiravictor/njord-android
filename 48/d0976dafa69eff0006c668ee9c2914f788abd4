@@ -1,0 +1,22 @@
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+  h_261d8b521f67f2 1-6
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+  h_261d8b521f67f2 1-6
+app/src/main/res/values/ic_launcher_background.xml
+  h_261d8b521f67f2 1-4
+app/src/main/res/drawable/ic_launcher_foreground.xml
+  h_261d8b521f67f2 1-23
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+  h_261d8b521f67f2 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "48d0976dafa69eff0006c668ee9c2914f788abd4",
+  "prompts": {},
+  "humans": {
+    "h_261d8b521f67f2": {
+      "author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
