@@ -42,7 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Menu
@@ -88,7 +87,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -180,6 +181,34 @@ private val LiveStrategyFilterActive = Color(0xFF263846)
 private val LiveCardSurface = Color(0xFF151A21)
 private val LiveTileSurface = Color(0xFF25292F)
 private val LiveErrorSurface = Color(0xFF18161B)
+
+private val PerformanceIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "PerformanceChart",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(2f, 17f); lineTo(2f, 21f); lineTo(6f, 21f); lineTo(6f, 17f); close()
+        }
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(9f, 12f); lineTo(9f, 21f); lineTo(13f, 21f); lineTo(13f, 12f); close()
+        }
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(16f, 7f); lineTo(16f, 21f); lineTo(20f, 21f); lineTo(20f, 7f); close()
+        }
+        path(
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.6f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round
+        ) {
+            moveTo(4f, 17f); lineTo(11f, 12f); lineTo(18f, 7f)
+        }
+    }.build()
+}
 
 private data class CoinLogoSources(
     val primaryUrl: String,
@@ -1128,7 +1157,7 @@ private fun BottomNavBar(selected: Destination, onNavigate: (Destination) -> Uni
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         NavItem("Home", Icons.Outlined.Home, selected == Destination.Home) { onNavigate(Destination.Home) }
-        NavItem("Portfolio", Icons.Outlined.AccountBalanceWallet, selected == Destination.Portfolio) { onNavigate(Destination.Portfolio) }
+        NavItem("Performance", PerformanceIcon, selected == Destination.Portfolio) { onNavigate(Destination.Portfolio) }
         NavItem("Live", Icons.Outlined.Sensors, selected == Destination.Live) { onNavigate(Destination.Live) }
         NavItem("More", Icons.Outlined.MoreHoriz, selected == Destination.More) { onNavigate(Destination.More) }
     }

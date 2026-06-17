@@ -283,7 +283,6 @@ class NjordApiClientTest {
         val json = """
             {
               "total_equity":18420.0,
-              "initial_capital":10000.0,
               "all_time_return_pct":84.2,
               "performance_strip":{
                 "today_pnl":96.0,
@@ -492,7 +491,6 @@ class NjordApiClientTest {
     fun mapApiPortfolio_formatsSnapshotForPortfolioCards() {
         val response = PortfolioApiResponse(
             totalEquity = 18420.0,
-            initialCapital = 10000.0,
             allTimeReturnPct = 84.2,
             performanceStrip = PortfolioPerformanceStripApiResponse(
                 todayPnl = 96.0,

@@ -25,6 +25,8 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
     val todayPnlValue = response.performanceStrip.todayPnl ?: intradayPnl
     val todayPnlKnown = response.performanceStrip.todayPnl != null
 
+    val peakReturn = (response.equityCurve.maxOfOrNull { it.equity } ?: 100.0) - 100.0
+
     return PortfolioSnapshot(
         totalEquity = formatCompactCurrency(response.totalEquity),
         returnBadge = "ALL ${formatSignedPercent(response.allTimeReturnPct)}",
@@ -51,8 +53,8 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
             PortfolioMetric("AVERAGE", averagePnl?.let(::formatSignedPercent) ?: "N/A", averagePnl?.let(::toneFor) ?: Tone.Muted, "Last ${response.monthlyReturns.size.coerceAtLeast(1)} months")
         ),
         equityStats = listOf(
-            PortfolioMetric("Current", formatCompactCurrency(response.totalEquity)),
-            PortfolioMetric("High", formatCompactCurrency(response.equityCurve.maxOfOrNull { it.equity } ?: response.totalEquity)),
+            PortfolioMetric("Total Profit", formatCompactCurrency(response.totalEquity), toneFor(response.totalEquity)),
+            PortfolioMetric("Peak Return", formatSignedPercent(peakReturn), toneFor(peakReturn)),
             PortfolioMetric("30D P&L", response.performanceStrip.thirtyDayPnl?.let(::formatSignedCurrency) ?: "N/A", toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0))
         ),
         equityCurve = normalizeSeries(response.equityCurve.map { it.equity }),

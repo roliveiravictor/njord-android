@@ -144,7 +144,6 @@ data class PortfolioMonthlyStatsApiResponse(
 
 data class PortfolioApiResponse(
     val totalEquity: Double,
-    val initialCapital: Double,
     val allTimeReturnPct: Double,
     val performanceStrip: PortfolioPerformanceStripApiResponse,
     val liveMetrics: PortfolioLiveMetricsApiResponse,
@@ -477,7 +476,6 @@ object NjordApiClient {
             PortfolioResult.Success(
                 PortfolioApiResponse(
                     totalEquity = root.optDouble("total_equity", 0.0),
-                    initialCapital = root.optDouble("initial_capital", 0.0),
                     allTimeReturnPct = root.optDouble("all_time_return_pct", 0.0),
                     performanceStrip = PortfolioPerformanceStripApiResponse(
                         todayPnl = performanceStripObject.optionalDouble("today_pnl"),
@@ -746,11 +744,12 @@ object NjordApiClient {
 
     private fun openConnection(url: String, apiKey: String): HttpURLConnection =
         (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 15_000
+            connectTimeout = 30_000
+            readTimeout = 30_000
             requestMethod = "GET"
             setRequestProperty("User-Agent", "Njord Android")
             setRequestProperty("X-API-Key", apiKey)
+            setRequestProperty("Cache-Control", "no-cache")
         }
 
     internal fun logsUrl(baseUrl: String): String =

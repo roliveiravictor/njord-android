@@ -38,7 +38,7 @@ class NjordAppTest {
 
     @Test
     fun bottomNavigation_switchesTopLevelScreens() {
-        compose.onNodeWithTag("nav-Portfolio").performClick()
+        compose.onNodeWithTag("nav-Performance").performClick()
         compose.onNodeWithTag("screen-Portfolio").assertIsDisplayed()
 
         compose.onNodeWithTag("nav-Live").performClick()
@@ -57,7 +57,7 @@ class NjordAppTest {
 
     @Test
     fun portfolioScreen_matchesReferenceContent() {
-        compose.onNodeWithTag("nav-Portfolio").performClick()
+        compose.onNodeWithTag("nav-Performance").performClick()
 
         compose.onNodeWithText("PORTFOLIO PERFORMANCE").assertIsDisplayed()
         compose.onAllNodesWithText("$18.4k")[0].assertIsDisplayed()
@@ -73,7 +73,7 @@ class NjordAppTest {
 
     @Test
     fun portfolioStrategyChips_remainSelectable() {
-        compose.onNodeWithTag("nav-Portfolio").performClick()
+        compose.onNodeWithTag("nav-Performance").performClick()
         compose.onNodeWithTag("filter-WCR").performClick()
 
         compose.onNodeWithTag("filter-WCR").assertIsDisplayed()
