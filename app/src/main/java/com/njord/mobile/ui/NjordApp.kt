@@ -121,13 +121,13 @@ import com.njord.mobile.api.LogsResult
 import com.njord.mobile.api.NjordApiCache
 import com.njord.mobile.api.NjordApiClient
 import com.njord.mobile.api.ActivityResult
-import com.njord.mobile.api.PortfolioResult
+import com.njord.mobile.api.PerformanceResult
 import com.njord.mobile.api.mapApiActivity
 import com.njord.mobile.api.mapApiHeartbeat
 import com.njord.mobile.api.toAgeLabel
 import com.njord.mobile.api.mapApiHome
 import com.njord.mobile.api.mapApiLive
-import com.njord.mobile.api.mapApiPortfolio
+import com.njord.mobile.api.mapApiPerformance
 import com.njord.mobile.api.mapApiReport
 import com.njord.mobile.api.mapApiEntries
 import com.njord.mobile.api.parseIncidentsFromJson
@@ -136,10 +136,10 @@ import com.njord.mobile.model.ChartPoint
 import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.HunchReport
 import com.njord.mobile.model.NjordUiState
-import com.njord.mobile.model.PortfolioMetric
-import com.njord.mobile.model.PortfolioMonthReturn
-import com.njord.mobile.model.PortfolioPosition
-import com.njord.mobile.model.PortfolioSnapshot
+import com.njord.mobile.model.PerformanceMetric
+import com.njord.mobile.model.PerformanceMonthReturn
+import com.njord.mobile.model.PerformancePosition
+import com.njord.mobile.model.PerformanceSnapshot
 import com.njord.mobile.model.ReportFactor
 import com.njord.mobile.model.SideFilter
 import com.njord.mobile.model.StrategyCycle
@@ -175,7 +175,7 @@ private val Info = Color(0xFF9CB7FF)
 private val ActivityKept = Color(0xFFFF9F43)
 private val ActivityOpen = Color(0xFF4DA3FF)
 private val ActivityClosed = Color(0xFFB084FF)
-private val PortfolioTileSurface = Color(0xFF171C24)
+private val PerformanceTileSurface = Color(0xFF171C24)
 private val LiveFilterSurface = Color(0xFF15171B)
 private val LiveStrategyFilterActive = Color(0xFF263846)
 private val LiveCardSurface = Color(0xFF151A21)
@@ -198,14 +198,6 @@ private val PerformanceIcon: ImageVector by lazy {
         }
         path(fill = SolidColor(Color.Black)) {
             moveTo(16f, 7f); lineTo(16f, 21f); lineTo(20f, 21f); lineTo(20f, 7f); close()
-        }
-        path(
-            stroke = SolidColor(Color.Black),
-            strokeLineWidth = 1.6f,
-            strokeLineCap = StrokeCap.Round,
-            strokeLineJoin = StrokeJoin.Round
-        ) {
-            moveTo(4f, 17f); lineTo(11f, 12f); lineTo(18f, 7f)
         }
     }.build()
 }
@@ -309,11 +301,11 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         }
     }
 
-    LaunchedEffect(state.portfolioStrategyFilter) {
-        if (state.destination == Destination.Portfolio) {
-            val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
-            val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
-            scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
+    LaunchedEffect(state.performanceStrategyFilter) {
+        if (state.destination == Destination.Performance) {
+            val strategy = performanceApiStrategy(state.performanceStrategyFilter)
+            val cacheKey = performanceCacheKey(state.performanceStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadPerformanceData(context, onAction, strategy, cacheKey) }
         }
     }
 
@@ -338,7 +330,7 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         ) {
             if (
                 state.destination != Destination.Home &&
-                state.destination != Destination.Portfolio &&
+                state.destination != Destination.Performance &&
                 state.destination != Destination.Live &&
                 state.destination != Destination.More &&
                 state.destination != Destination.Activity &&
@@ -352,7 +344,7 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             }
             when (state.destination) {
                 Destination.Home -> item { HomeScreen(state, onAction) }
-                Destination.Portfolio -> item { PortfolioScreen(state, onAction) }
+                Destination.Performance -> item { PerformanceScreen(state, onAction) }
                 Destination.Live -> item { LiveScreen(state, onAction) }
                 Destination.More -> item { MoreScreen(onAction) }
                 Destination.Activity -> item { ActivityScreen(state, onAction) }
@@ -412,10 +404,10 @@ private fun launchLoadForDestination(
             val cacheKey = liveCacheKey(state.liveStrategyFilter)
             scope.launch(Dispatchers.IO) { loadLiveData(context, onAction, strategy, cacheKey) }
         }
-        Destination.Portfolio -> {
-            val strategy = portfolioApiStrategy(state.portfolioStrategyFilter)
-            val cacheKey = portfolioCacheKey(state.portfolioStrategyFilter)
-            scope.launch(Dispatchers.IO) { loadPortfolioData(context, onAction, strategy, cacheKey) }
+        Destination.Performance -> {
+            val strategy = performanceApiStrategy(state.performanceStrategyFilter)
+            val cacheKey = performanceCacheKey(state.performanceStrategyFilter)
+            scope.launch(Dispatchers.IO) { loadPerformanceData(context, onAction, strategy, cacheKey) }
         }
         Destination.Activity -> scope.launch(Dispatchers.IO) { loadActivityData(context, onAction) }
         Destination.Heartbeat -> scope.launch(Dispatchers.IO) { loadHeartbeatData(context, onAction) }
@@ -523,26 +515,26 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
 }
 
 
-private suspend fun loadPortfolioData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
+private suspend fun loadPerformanceData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
     NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
-        when (val cached = NjordApiClient.parsePortfolioResponse(cachedBody)) {
-            is PortfolioResult.Success -> dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(cached.response)))
-            is PortfolioResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
+        when (val cached = NjordApiClient.parsePerformanceResponse(cachedBody)) {
+            is PerformanceResult.Success -> dispatchUiAction(onAction, NjordAction.PerformanceLoaded(mapApiPerformance(cached.response)))
+            is PerformanceResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
             else -> {}
         }
     }
-    when (val result = NjordApiClient.fetchPortfolioPayload(
+    when (val result = NjordApiClient.fetchPerformancePayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
         com.njord.mobile.BuildConfig.NJORD_API_KEY,
         strategy
     )) {
         is ApiPayloadResult.Success -> {
-            when (val parsed = NjordApiClient.parsePortfolioResponse(result.body)) {
-                is PortfolioResult.Success -> {
+            when (val parsed = NjordApiClient.parsePerformanceResponse(result.body)) {
+                is PerformanceResult.Success -> {
                     NjordApiCache.write(context.filesDir, cacheKey, result.body)
-                    dispatchUiAction(onAction, NjordAction.PortfolioLoaded(mapApiPortfolio(parsed.response)))
+                    dispatchUiAction(onAction, NjordAction.PerformanceLoaded(mapApiPerformance(parsed.response)))
                 }
-                is PortfolioResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                is PerformanceResult.Error -> showApiParseFailureToast(context, result, parsed.message)
                 else -> {}
             }
         }
@@ -685,7 +677,7 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val snapshot = state.homeSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HomeEquityHero(snapshot) { onAction(NjordAction.Navigate(Destination.Portfolio)) }
+        HomeEquityHero(snapshot) { onAction(NjordAction.Navigate(Destination.Performance)) }
 
         SectionTitle("Strategies")
         val strategies = snapshot?.strategies.orEmpty()
@@ -713,27 +705,27 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 }
 
 @Composable
-private fun PortfolioScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val snapshot = state.portfolioSnapshot
+private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
+    val snapshot = state.performanceSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FilterRow(
             items = StrategyFilter.entries,
-            selected = state.portfolioStrategyFilter,
+            selected = state.performanceStrategyFilter,
             label = { it.label },
-            onSelect = { onAction(NjordAction.SetPortfolioStrategyFilter(it)) }
+            onSelect = { onAction(NjordAction.SetPerformanceStrategyFilter(it)) }
         )
         if (snapshot == null) {
-            NjordCard { Text("No portfolio data available yet.", color = TextMuted, fontSize = 13.sp) }
+            NjordCard { Text("No performance data available yet.", color = TextMuted, fontSize = 13.sp) }
         } else {
-            PortfolioPerformanceHero(snapshot)
+            PerformanceHero(snapshot, state.performanceStrategyFilter)
             SectionTitle("Live metrics")
-            PortfolioMetricGrid(snapshot.liveMetrics)
+            PerformanceMetricGrid(snapshot.liveMetrics)
             SectionTitle("Monthly stats")
-            PortfolioMonthlyStats(snapshot.monthlyStats)
+            PerformanceMonthlyStats(snapshot.monthlyStats)
             SectionTitle("Performance history")
-            PortfolioHistoryCard(
-                title = "Portfolio P&L over time",
+            PerformanceHistoryCard(
+                title = "Performance P&L over time",
                 trailing = "30D trend",
                 stats = snapshot.equityStats
             ) {
@@ -750,7 +742,7 @@ private fun PortfolioScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
     }
 }
 
-private fun portfolioApiStrategy(filter: StrategyFilter): String =
+private fun performanceApiStrategy(filter: StrategyFilter): String =
     when (filter) {
         StrategyFilter.All -> "all"
         StrategyFilter.BigBang -> "big_bang"
@@ -758,12 +750,12 @@ private fun portfolioApiStrategy(filter: StrategyFilter): String =
         StrategyFilter.Hunch -> "hunch"
     }
 
-private fun portfolioCacheKey(filter: StrategyFilter): ApiCacheKey =
+private fun performanceCacheKey(filter: StrategyFilter): ApiCacheKey =
     when (filter) {
-        StrategyFilter.All -> ApiCacheKey.PortfolioAll
-        StrategyFilter.BigBang -> ApiCacheKey.PortfolioBigBang
-        StrategyFilter.Wcr -> ApiCacheKey.PortfolioWcr
-        StrategyFilter.Hunch -> ApiCacheKey.PortfolioHunch
+        StrategyFilter.All -> ApiCacheKey.PerformanceAll
+        StrategyFilter.BigBang -> ApiCacheKey.PerformanceBigBang
+        StrategyFilter.Wcr -> ApiCacheKey.PerformanceWcr
+        StrategyFilter.Hunch -> ApiCacheKey.PerformanceHunch
     }
 
 private fun liveApiStrategy(filter: StrategyFilter): String =
@@ -1157,7 +1149,7 @@ private fun BottomNavBar(selected: Destination, onNavigate: (Destination) -> Uni
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         NavItem("Home", Icons.Outlined.Home, selected == Destination.Home) { onNavigate(Destination.Home) }
-        NavItem("Performance", PerformanceIcon, selected == Destination.Portfolio) { onNavigate(Destination.Portfolio) }
+        NavItem("Performance", PerformanceIcon, selected == Destination.Performance) { onNavigate(Destination.Performance) }
         NavItem("Live", Icons.Outlined.Sensors, selected == Destination.Live) { onNavigate(Destination.Live) }
         NavItem("More", Icons.Outlined.MoreHoriz, selected == Destination.More) { onNavigate(Destination.More) }
     }
@@ -1260,7 +1252,7 @@ private fun HomeHeroKpi(label: String, value: String) {
 }
 
 @Composable
-private fun PortfolioPerformanceHero(snapshot: PortfolioSnapshot) {
+private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: StrategyFilter) {
     val shape = RoundedCornerShape(28.dp)
     Column(
         modifier = Modifier
@@ -1269,11 +1261,12 @@ private fun PortfolioPerformanceHero(snapshot: PortfolioSnapshot) {
             .background(Brush.linearGradient(listOf(Color(0xFF12303D), Color(0xFF121820))))
             .border(1.dp, Primary.copy(alpha = 0.22f), shape)
             .padding(22.dp)
-            .testTag("portfolioPerformanceHero")
+            .testTag("performanceHero")
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text("PORTFOLIO PERFORMANCE", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
+                Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(7.dp))
                 Text(snapshot.totalEquity, color = Success, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
@@ -1289,20 +1282,20 @@ private fun PortfolioPerformanceHero(snapshot: PortfolioSnapshot) {
         }
         Spacer(Modifier.height(28.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PortfolioStatTile("TODAY", snapshot.todayPnl, snapshot.todayTone, snapshot.todayPct, Modifier.weight(1f))
-            PortfolioStatTile("7D", snapshot.sevenDayPnl, snapshot.sevenDayTone, snapshot.sevenDayPct, Modifier.weight(1f))
-            PortfolioStatTile("30D", snapshot.thirtyDayPnl, snapshot.thirtyDayTone, snapshot.thirtyDayPct, Modifier.weight(1f))
+            PerformanceStatTile("TODAY", snapshot.todayPnl, snapshot.todayTone, snapshot.todayPct, Modifier.weight(1f))
+            PerformanceStatTile("7D", snapshot.sevenDayPnl, snapshot.sevenDayTone, snapshot.sevenDayPct, Modifier.weight(1f))
+            PerformanceStatTile("30D", snapshot.thirtyDayPnl, snapshot.thirtyDayTone, snapshot.thirtyDayPct, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun PortfolioMetricGrid(metrics: List<PortfolioMetric>) {
+private fun PerformanceMetricGrid(metrics: List<PerformanceMetric>) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         metrics.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { metric ->
-                    PortfolioStatTile(metric.label, metric.value, metric.tone, metric.subtext, Modifier.weight(1f))
+                    PerformanceStatTile(metric.label, metric.value, metric.tone, metric.subtext, Modifier.weight(1f))
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
@@ -1311,19 +1304,19 @@ private fun PortfolioMetricGrid(metrics: List<PortfolioMetric>) {
 }
 
 @Composable
-private fun PortfolioMonthlyStats(stats: List<PortfolioMetric>) {
+private fun PerformanceMonthlyStats(stats: List<PerformanceMetric>) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         stats.forEach { stat ->
-            PortfolioStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
+            PerformanceStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun PortfolioHistoryCard(
+private fun PerformanceHistoryCard(
     title: String,
     trailing: String,
-    stats: List<PortfolioMetric>,
+    stats: List<PerformanceMetric>,
     content: @Composable () -> Unit
 ) {
     NjordCard {
@@ -1334,7 +1327,7 @@ private fun PortfolioHistoryCard(
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             stats.forEach { stat ->
-                PortfolioStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
+                PerformanceStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -1343,7 +1336,7 @@ private fun PortfolioHistoryCard(
 }
 
 @Composable
-private fun PortfolioStatTile(
+private fun PerformanceStatTile(
     label: String,
     value: String,
     tone: Tone = Tone.Muted,
@@ -1353,7 +1346,7 @@ private fun PortfolioStatTile(
     Column(
         modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(PortfolioTileSurface)
+            .background(PerformanceTileSurface)
             .border(1.dp, Color.White.copy(alpha = 0.065f), RoundedCornerShape(18.dp))
             .padding(horizontal = 10.dp, vertical = 12.dp)
     ) {
@@ -1368,8 +1361,8 @@ private fun PortfolioStatTile(
 }
 
 @Composable
-private fun DrawdownHistoryCard(snapshot: PortfolioSnapshot) {
-    PortfolioHistoryCard(
+private fun DrawdownHistoryCard(snapshot: PerformanceSnapshot) {
+    PerformanceHistoryCard(
         title = "Drawdown",
         trailing = "Risk depth",
         stats = snapshot.drawdownStats
@@ -1384,8 +1377,8 @@ private fun DrawdownHistoryCard(snapshot: PortfolioSnapshot) {
 }
 
 @Composable
-private fun ReturnByMonthCard(snapshot: PortfolioSnapshot) {
-    PortfolioHistoryCard(
+private fun ReturnByMonthCard(snapshot: PerformanceSnapshot) {
+    PerformanceHistoryCard(
         title = "Return by month",
         trailing = "6-month view",
         stats = snapshot.monthlyStats
@@ -1661,7 +1654,7 @@ private fun SmallLiveDot() {
 }
 
 @Composable
-private fun PortfolioPositionCard(position: PortfolioPosition) {
+private fun PerformancePositionCard(position: PerformancePosition) {
     NjordCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CoinIcon(position.symbol, position.tone)

@@ -39,7 +39,7 @@ class NjordAppTest {
     @Test
     fun bottomNavigation_switchesTopLevelScreens() {
         compose.onNodeWithTag("nav-Performance").performClick()
-        compose.onNodeWithTag("screen-Portfolio").assertIsDisplayed()
+        compose.onNodeWithTag("screen-Performance").assertIsDisplayed()
 
         compose.onNodeWithTag("nav-Live").performClick()
         compose.onNodeWithTag("screen-Live").assertIsDisplayed()
@@ -49,17 +49,17 @@ class NjordAppTest {
     }
 
     @Test
-    fun homeBalanceWidget_opensPortfolio() {
+    fun homeBalanceWidget_opensPerformance() {
         compose.onNodeWithTag("homeEquityHero").performClick()
 
-        compose.onNodeWithTag("screen-Portfolio").assertIsDisplayed()
+        compose.onNodeWithTag("screen-Performance").assertIsDisplayed()
     }
 
     @Test
-    fun portfolioScreen_matchesReferenceContent() {
+    fun performanceScreen_matchesReferenceContent() {
         compose.onNodeWithTag("nav-Performance").performClick()
 
-        compose.onNodeWithText("PORTFOLIO PERFORMANCE").assertIsDisplayed()
+        compose.onNodeWithText("PERFORMANCE").assertIsDisplayed()
         compose.onAllNodesWithText("$18.4k")[0].assertIsDisplayed()
         compose.onNodeWithText("Total equity").assertIsDisplayed()
         compose.onNodeWithText("ALL +127.4%").assertIsDisplayed()
@@ -72,12 +72,12 @@ class NjordAppTest {
     }
 
     @Test
-    fun portfolioStrategyChips_remainSelectable() {
+    fun performanceStrategyChips_remainSelectable() {
         compose.onNodeWithTag("nav-Performance").performClick()
         compose.onNodeWithTag("filter-WCR").performClick()
 
         compose.onNodeWithTag("filter-WCR").assertIsDisplayed()
-        compose.onNodeWithTag("screen-Portfolio").assertIsDisplayed()
+        compose.onNodeWithTag("screen-Performance").assertIsDisplayed()
     }
 
     @Test

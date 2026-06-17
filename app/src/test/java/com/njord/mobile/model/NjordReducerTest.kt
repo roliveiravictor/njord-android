@@ -117,16 +117,16 @@ class NjordReducerTest {
     }
 
     @Test
-    fun portfolioLoading_setsLoadingTrueAndErrorFalse() {
-        val state = reduce(NjordUiState(portfolioError = true), NjordAction.PortfolioLoading)
+    fun performanceLoading_setsLoadingTrueAndErrorFalse() {
+        val state = reduce(NjordUiState(performanceError = true), NjordAction.PerformanceLoading)
 
-        assertTrue(state.portfolioLoading)
-        assertFalse(state.portfolioError)
+        assertTrue(state.performanceLoading)
+        assertFalse(state.performanceError)
     }
 
     @Test
-    fun portfolioLoaded_replacesSnapshotAndClearsLoading() {
-        val snapshot = PortfolioSnapshot(
+    fun performanceLoaded_replacesSnapshotAndClearsLoading() {
+        val snapshot = PerformanceSnapshot(
             totalEquity = "\$18.4k",
             returnBadge = "ALL +84.2%",
             returnTone = Tone.Success,
@@ -149,21 +149,21 @@ class NjordReducerTest {
             drawdownAxisLabels = emptyList(),
             monthlyReturns = emptyList()
         )
-        val state = reduce(NjordUiState(portfolioLoading = true), NjordAction.PortfolioLoaded(snapshot))
+        val state = reduce(NjordUiState(performanceLoading = true), NjordAction.PerformanceLoaded(snapshot))
 
-        assertEquals(snapshot, state.portfolioSnapshot)
-        assertFalse(state.portfolioLoading)
-        assertFalse(state.portfolioError)
+        assertEquals(snapshot, state.performanceSnapshot)
+        assertFalse(state.performanceLoading)
+        assertFalse(state.performanceError)
     }
 
     @Test
-    fun portfolioError_setsErrorTrueAndKeepsFallbackSnapshot() {
-        val initial = NjordUiState(portfolioLoading = true)
-        val state = reduce(initial, NjordAction.PortfolioError)
+    fun performanceError_setsErrorTrueAndKeepsFallbackSnapshot() {
+        val initial = NjordUiState(performanceLoading = true)
+        val state = reduce(initial, NjordAction.PerformanceError)
 
-        assertEquals(initial.portfolioSnapshot, state.portfolioSnapshot)
-        assertTrue(state.portfolioError)
-        assertFalse(state.portfolioLoading)
+        assertEquals(initial.performanceSnapshot, state.performanceSnapshot)
+        assertTrue(state.performanceError)
+        assertFalse(state.performanceLoading)
     }
 
     @Test

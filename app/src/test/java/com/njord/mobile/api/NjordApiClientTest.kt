@@ -33,10 +33,10 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun portfolioUrl_requestsSelectedStrategy() {
-        val url = NjordApiClient.portfolioUrl("https://noatun.dev", "big_bang")
+    fun performanceUrl_requestsSelectedStrategy() {
+        val url = NjordApiClient.performanceUrl("https://noatun.dev", "big_bang")
 
-        assertEquals("https://noatun.dev/v1/portfolio?strategy=big_bang", url)
+        assertEquals("https://noatun.dev/v1/performance?strategy=big_bang", url)
     }
 
     @Test
@@ -279,7 +279,7 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun parsePortfolioResponse_wellFormedJson_returnsSuccessWithMetrics() {
+    fun parsePerformanceResponse_wellFormedJson_returnsSuccessWithMetrics() {
         val json = """
             {
               "total_equity":18420.0,
@@ -322,10 +322,10 @@ class NjordApiClientTest {
             }
         """.trimIndent()
 
-        val result = NjordApiClient.parsePortfolioResponse(json)
+        val result = NjordApiClient.parsePerformanceResponse(json)
 
-        assertTrue(result is PortfolioResult.Success)
-        val response = (result as PortfolioResult.Success).response
+        assertTrue(result is PerformanceResult.Success)
+        val response = (result as PerformanceResult.Success).response
         assertEquals(18420.0, response.totalEquity, 0.0001)
         assertEquals(96.0, response.performanceStrip.todayPnl ?: 0.0, 0.0001)
         assertEquals(124, response.liveMetrics.totalClosedTrades)
@@ -335,10 +335,10 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun parsePortfolioResponse_missingLiveMetrics_returnsError() {
-        val result = NjordApiClient.parsePortfolioResponse("""{"performance_strip":{}}""")
+    fun parsePerformanceResponse_missingLiveMetrics_returnsError() {
+        val result = NjordApiClient.parsePerformanceResponse("""{"performance_strip":{}}""")
 
-        assertTrue(result is PortfolioResult.Error)
+        assertTrue(result is PerformanceResult.Error)
     }
 
     @Test
@@ -488,11 +488,11 @@ class NjordApiClientTest {
     }
 
     @Test
-    fun mapApiPortfolio_formatsSnapshotForPortfolioCards() {
-        val response = PortfolioApiResponse(
+    fun mapApiPerformance_formatsSnapshotForPerformanceCards() {
+        val response = PerformanceApiResponse(
             totalEquity = 18420.0,
             allTimeReturnPct = 84.2,
-            performanceStrip = PortfolioPerformanceStripApiResponse(
+            performanceStrip = PerformanceStripApiResponse(
                 todayPnl = 96.0,
                 todayPnlPct = 0.5,
                 sevenDayPnl = 812.0,
@@ -500,7 +500,7 @@ class NjordApiClientTest {
                 thirtyDayPnl = 2400.0,
                 thirtyDayPnlPct = 14.8
             ),
-            liveMetrics = PortfolioLiveMetricsApiResponse(
+            liveMetrics = PerformanceLiveMetricsApiResponse(
                 realizedPnl = 1900.0,
                 unrealizedPnl = -428.0,
                 winRate = 56.0,
@@ -508,28 +508,28 @@ class NjordApiClientTest {
                 totalClosedTrades = 124
             ),
             equityCurve = listOf(
-                PortfolioEquityPointApiResponse("2026-05-10", 16000.0),
-                PortfolioEquityPointApiResponse("2026-06-10", 18420.0)
+                PerformanceEquityPointApiResponse("2026-05-10", 16000.0),
+                PerformanceEquityPointApiResponse("2026-06-10", 18420.0)
             ),
             drawdownSeries = listOf(
-                PortfolioDrawdownPointApiResponse("2026-05-10", 0.0),
-                PortfolioDrawdownPointApiResponse("2026-06-10", -2.1)
+                PerformanceDrawdownPointApiResponse("2026-05-10", 0.0),
+                PerformanceDrawdownPointApiResponse("2026-06-10", -2.1)
             ),
             maxDrawdownPct = -6.4,
             currentDrawdownPct = -2.1,
             recoveryPct = 63.0,
             monthlyReturns = listOf(
-                PortfolioMonthlyReturnApiResponse("2026-05", 300.0, 3.8),
-                PortfolioMonthlyReturnApiResponse("2026-06", 120.0, 1.4)
+                PerformanceMonthlyReturnApiResponse("2026-05", 300.0, 3.8),
+                PerformanceMonthlyReturnApiResponse("2026-06", 120.0, 1.4)
             ),
-            monthlyStats = PortfolioMonthlyStatsApiResponse(
+            monthlyStats = PerformanceMonthlyStatsApiResponse(
                 bestMonth = null,
                 worstMonth = null,
                 averageMonthlyPnl = null
             )
         )
 
-        val snapshot = mapApiPortfolio(response)
+        val snapshot = mapApiPerformance(response)
 
         assertEquals("\$18.4K", snapshot.totalEquity)
         assertEquals("ALL +84.2%", snapshot.returnBadge)

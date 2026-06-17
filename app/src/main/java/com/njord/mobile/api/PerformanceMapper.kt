@@ -1,9 +1,9 @@
 package com.njord.mobile.api
 
 import com.njord.mobile.model.ChartPoint
-import com.njord.mobile.model.PortfolioMetric
-import com.njord.mobile.model.PortfolioMonthReturn
-import com.njord.mobile.model.PortfolioSnapshot
+import com.njord.mobile.model.PerformanceMetric
+import com.njord.mobile.model.PerformanceMonthReturn
+import com.njord.mobile.model.PerformanceSnapshot
 import com.njord.mobile.model.Tone
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -14,7 +14,7 @@ import kotlin.math.abs
 private val USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US)
 private val MONTH_OUTPUT = DateTimeFormatter.ofPattern("MMM", Locale.US)
 
-internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot {
+internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSnapshot {
     val monthlyReturns = mapMonthlyReturns(response.monthlyReturns)
     val bestMonth = response.monthlyStats.bestMonth ?: response.monthlyReturns.maxByOrNull { it.pnlPct }
     val worstMonth = response.monthlyStats.worstMonth ?: response.monthlyReturns.minByOrNull { it.pnlPct }
@@ -27,7 +27,7 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
 
     val peakReturn = (response.equityCurve.maxOfOrNull { it.equity } ?: 100.0) - 100.0
 
-    return PortfolioSnapshot(
+    return PerformanceSnapshot(
         totalEquity = formatCompactCurrency(response.totalEquity),
         returnBadge = "ALL ${formatSignedPercent(response.allTimeReturnPct)}",
         returnTone = toneFor(response.allTimeReturnPct),
@@ -42,27 +42,27 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
         thirtyDayPct = response.performanceStrip.thirtyDayPnlPct?.let(::formatSignedPercent) ?: "No baseline",
         thirtyDayTone = toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0),
         liveMetrics = listOf(
-            PortfolioMetric("REALIZED P&L", formatSignedCurrency(response.liveMetrics.realizedPnl), toneFor(response.liveMetrics.realizedPnl), "Closed positions"),
-            PortfolioMetric("UNREALIZED P&L", formatSignedCurrency(response.liveMetrics.unrealizedPnl), toneFor(response.liveMetrics.unrealizedPnl), "Open positions"),
-            PortfolioMetric("WIN RATE", "${formatNumber(response.liveMetrics.winRate)}%", Tone.Muted, "${response.liveMetrics.totalClosedTrades} closed trades"),
-            PortfolioMetric("PROFIT FACTOR", formatNumber(response.liveMetrics.profitFactor), Tone.Muted, "Gross profit / loss")
+            PerformanceMetric("REALIZED P&L", formatSignedCurrency(response.liveMetrics.realizedPnl), toneFor(response.liveMetrics.realizedPnl), "Closed positions"),
+            PerformanceMetric("UNREALIZED P&L", formatSignedCurrency(response.liveMetrics.unrealizedPnl), toneFor(response.liveMetrics.unrealizedPnl), "Open positions"),
+            PerformanceMetric("WIN RATE", "${formatNumber(response.liveMetrics.winRate)}%", Tone.Muted, "${response.liveMetrics.totalClosedTrades} closed trades"),
+            PerformanceMetric("PROFIT FACTOR", formatNumber(response.liveMetrics.profitFactor), Tone.Muted, "Gross profit / loss")
         ),
         monthlyStats = listOf(
-            PortfolioMetric("BEST MONTH", bestMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", bestMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, bestMonth?.month?.let(::formatMonth) ?: "No data"),
-            PortfolioMetric("WORST MONTH", worstMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", worstMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, worstMonth?.month?.let(::formatMonth) ?: "No data"),
-            PortfolioMetric("AVERAGE", averagePnl?.let(::formatSignedPercent) ?: "N/A", averagePnl?.let(::toneFor) ?: Tone.Muted, "Last ${response.monthlyReturns.size.coerceAtLeast(1)} months")
+            PerformanceMetric("BEST MONTH", bestMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", bestMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, bestMonth?.month?.let(::formatMonth) ?: "No data"),
+            PerformanceMetric("WORST MONTH", worstMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", worstMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, worstMonth?.month?.let(::formatMonth) ?: "No data"),
+            PerformanceMetric("AVERAGE", averagePnl?.let(::formatSignedPercent) ?: "N/A", averagePnl?.let(::toneFor) ?: Tone.Muted, "Last ${response.monthlyReturns.size.coerceAtLeast(1)} months")
         ),
         equityStats = listOf(
-            PortfolioMetric("Total Profit", formatCompactCurrency(response.totalEquity), toneFor(response.totalEquity)),
-            PortfolioMetric("Peak Return", formatSignedPercent(peakReturn), toneFor(peakReturn)),
-            PortfolioMetric("30D P&L", response.performanceStrip.thirtyDayPnl?.let(::formatSignedCurrency) ?: "N/A", toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0))
+            PerformanceMetric("Total Profit", formatCompactCurrency(response.totalEquity), toneFor(response.totalEquity)),
+            PerformanceMetric("Peak Return", formatSignedPercent(peakReturn), toneFor(peakReturn)),
+            PerformanceMetric("30D P&L", response.performanceStrip.thirtyDayPnl?.let(::formatSignedCurrency) ?: "N/A", toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0))
         ),
         equityCurve = normalizeSeries(response.equityCurve.map { it.equity }),
         equityAxisLabels = axisLabels(response.equityCurve.map { it.timestamp }, fallbackEnd = "Today"),
         drawdownStats = listOf(
-            PortfolioMetric("Current", formatDrawdown(response.currentDrawdownPct), toneForDrawdown(response.currentDrawdownPct)),
-            PortfolioMetric("Max", formatDrawdown(response.maxDrawdownPct), toneForDrawdown(response.maxDrawdownPct)),
-            PortfolioMetric("Recovery", "${formatNumber(response.recoveryPct)}%")
+            PerformanceMetric("Current", formatDrawdown(response.currentDrawdownPct), toneForDrawdown(response.currentDrawdownPct)),
+            PerformanceMetric("Max", formatDrawdown(response.maxDrawdownPct), toneForDrawdown(response.maxDrawdownPct)),
+            PerformanceMetric("Recovery", "${formatNumber(response.recoveryPct)}%")
         ),
         drawdownCurve = normalizeSeries(response.drawdownSeries.map { abs(it.drawdownPct) }, invert = false),
         drawdownAxisLabels = axisLabels(response.drawdownSeries.map { it.timestamp }, fallbackStart = "0%", fallbackEnd = "Recovery"),
@@ -70,10 +70,10 @@ internal fun mapApiPortfolio(response: PortfolioApiResponse): PortfolioSnapshot 
     )
 }
 
-private fun mapMonthlyReturns(returns: List<PortfolioMonthlyReturnApiResponse>): List<PortfolioMonthReturn> {
+private fun mapMonthlyReturns(returns: List<PerformanceMonthlyReturnApiResponse>): List<PerformanceMonthReturn> {
     val maxAbs = returns.maxOfOrNull { abs(it.pnlPct) }?.takeIf { it > 0.0 } ?: 1.0
     return returns.map {
-        PortfolioMonthReturn(
+        PerformanceMonthReturn(
             month = formatMonth(it.month),
             value = formatSignedPercent(it.pnlPct),
             progress = (abs(it.pnlPct) / maxAbs).toFloat().coerceIn(0.08f, 1f),

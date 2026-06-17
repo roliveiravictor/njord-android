@@ -2,7 +2,7 @@ package com.njord.mobile.model
 
 enum class Destination(val title: String, val subtitle: String) {
     Home("Home", "Balance, open P&L, and strategy health"),
-    Portfolio("Portfolio", "Performance history filtered by strategy"),
+    Performance("Performance", "Performance history filtered by strategy"),
     Live("Live", "Current open positions and real-time P&L"),
     More("More", "Operational diagnostics and reports"),
     Activity("Activity", "Candle-close cycles and strategy activity"),
@@ -50,7 +50,7 @@ data class NjordUiState(
     val destination: Destination = Destination.Home,
     val liveStrategyFilter: StrategyFilter = StrategyFilter.All,
     val liveSideFilter: SideFilter = SideFilter.All,
-    val portfolioStrategyFilter: StrategyFilter = StrategyFilter.All,
+    val performanceStrategyFilter: StrategyFilter = StrategyFilter.All,
     val logFilter: LogFilter = LogFilter.All,
     val logQuery: String = "",
     val logStrategyFilter: StrategyFilter = StrategyFilter.All,
@@ -67,9 +67,9 @@ data class NjordUiState(
     val hunchReport: HunchReport? = null,
     val hunchReportLoading: Boolean = false,
     val hunchReportError: Boolean = false,
-    val portfolioSnapshot: PortfolioSnapshot? = null,
-    val portfolioLoading: Boolean = false,
-    val portfolioError: Boolean = false,
+    val performanceSnapshot: PerformanceSnapshot? = null,
+    val performanceLoading: Boolean = false,
+    val performanceError: Boolean = false,
     val homeSnapshot: HomeSnapshot? = null,
     val homeLoading: Boolean = false,
     val homeError: Boolean = false,
@@ -90,7 +90,7 @@ sealed interface NjordAction {
     data class Navigate(val destination: Destination) : NjordAction
     data class SetLiveStrategyFilter(val filter: StrategyFilter) : NjordAction
     data class SetLiveSideFilter(val filter: SideFilter) : NjordAction
-    data class SetPortfolioStrategyFilter(val filter: StrategyFilter) : NjordAction
+    data class SetPerformanceStrategyFilter(val filter: StrategyFilter) : NjordAction
     data class SetLogFilter(val filter: LogFilter) : NjordAction
     data class SetLogQuery(val query: String) : NjordAction
     data class SetLogStrategyFilter(val filter: StrategyFilter) : NjordAction
@@ -126,9 +126,9 @@ sealed interface NjordAction {
     data object HunchReportLoading : NjordAction
     data class HunchReportLoaded(val report: HunchReport) : NjordAction
     data object HunchReportError : NjordAction
-    data object PortfolioLoading : NjordAction
-    data class PortfolioLoaded(val snapshot: PortfolioSnapshot) : NjordAction
-    data object PortfolioError : NjordAction
+    data object PerformanceLoading : NjordAction
+    data class PerformanceLoaded(val snapshot: PerformanceSnapshot) : NjordAction
+    data object PerformanceError : NjordAction
     data object HomeLoading : NjordAction
     data class HomeLoaded(val snapshot: HomeSnapshot) : NjordAction
     data object HomeError : NjordAction
@@ -150,7 +150,7 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
 
         is NjordAction.SetLiveStrategyFilter -> state.copy(liveStrategyFilter = action.filter)
         is NjordAction.SetLiveSideFilter -> state.copy(liveSideFilter = action.filter)
-        is NjordAction.SetPortfolioStrategyFilter -> state.copy(portfolioStrategyFilter = action.filter)
+        is NjordAction.SetPerformanceStrategyFilter -> state.copy(performanceStrategyFilter = action.filter)
         is NjordAction.SetLogFilter -> state.copy(logFilter = action.filter)
         is NjordAction.SetLogQuery -> state.copy(logQuery = action.query)
         is NjordAction.SetLogStrategyFilter -> state.copy(logStrategyFilter = action.filter)
@@ -205,13 +205,13 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
             hunchReportError = false
         )
         NjordAction.HunchReportError -> state.copy(hunchReportLoading = false, hunchReportError = true)
-        NjordAction.PortfolioLoading -> state.copy(portfolioLoading = true, portfolioError = false)
-        is NjordAction.PortfolioLoaded -> state.copy(
-            portfolioSnapshot = action.snapshot,
-            portfolioLoading = false,
-            portfolioError = false
+        NjordAction.PerformanceLoading -> state.copy(performanceLoading = true, performanceError = false)
+        is NjordAction.PerformanceLoaded -> state.copy(
+            performanceSnapshot = action.snapshot,
+            performanceLoading = false,
+            performanceError = false
         )
-        NjordAction.PortfolioError -> state.copy(portfolioLoading = false, portfolioError = true)
+        NjordAction.PerformanceError -> state.copy(performanceLoading = false, performanceError = true)
         NjordAction.HomeLoading -> state.copy(homeLoading = true, homeError = false)
         is NjordAction.HomeLoaded -> state.copy(
             homeSnapshot = action.snapshot,
@@ -280,7 +280,7 @@ data class StrategySummary(
     val assets: String? = null
 )
 data class ActivitySummary(val opened: String, val closed: String, val kept: String)
-data class PortfolioSnapshot(
+data class PerformanceSnapshot(
     val totalEquity: String,
     val returnBadge: String,
     val returnTone: Tone,
@@ -293,23 +293,23 @@ data class PortfolioSnapshot(
     val thirtyDayPnl: String,
     val thirtyDayPct: String,
     val thirtyDayTone: Tone,
-    val liveMetrics: List<PortfolioMetric>,
-    val monthlyStats: List<PortfolioMetric>,
-    val equityStats: List<PortfolioMetric>,
+    val liveMetrics: List<PerformanceMetric>,
+    val monthlyStats: List<PerformanceMetric>,
+    val equityStats: List<PerformanceMetric>,
     val equityCurve: List<ChartPoint>,
     val equityAxisLabels: List<String>,
-    val drawdownStats: List<PortfolioMetric>,
+    val drawdownStats: List<PerformanceMetric>,
     val drawdownCurve: List<ChartPoint>,
     val drawdownAxisLabels: List<String>,
-    val monthlyReturns: List<PortfolioMonthReturn>
+    val monthlyReturns: List<PerformanceMonthReturn>
 )
-data class PortfolioMetric(
+data class PerformanceMetric(
     val label: String,
     val value: String,
     val tone: Tone = Tone.Muted,
     val subtext: String? = null
 )
-data class PortfolioMonthReturn(
+data class PerformanceMonthReturn(
     val month: String,
     val value: String,
     val progress: Float,
@@ -355,7 +355,7 @@ data class LiveOutcome(
     val tone: Tone
 )
 
-data class PortfolioPosition(
+data class PerformancePosition(
     val symbol: String,
     val side: String,
     val strategy: StrategyFilter,
