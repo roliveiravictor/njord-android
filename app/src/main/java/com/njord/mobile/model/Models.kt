@@ -80,6 +80,7 @@ data class NjordUiState(
     val livePositions: List<LivePosition> = emptyList(),
     val liveAnalytics: LiveAnalyticsSnapshot? = null,
     val liveIncidents: List<Incident> = emptyList(),
+    val dismissedIncidentIds: Set<String> = emptySet(),
     val liveLoading: Boolean = false,
     val liveError: Boolean = false,
     val selectedIncident: Incident? = null,
@@ -95,6 +96,7 @@ sealed interface NjordAction {
     data class SetLogQuery(val query: String) : NjordAction
     data class SetLogStrategyFilter(val filter: StrategyFilter) : NjordAction
     data class IncidentsSeeded(val incidents: List<Incident>) : NjordAction
+    data class IncidentAcknowledgementsLoaded(val incidentIds: Set<String>) : NjordAction
     data class IncidentsReceived(val incidents: List<Incident>) : NjordAction
     data class SelectIncident(val incident: Incident) : NjordAction
     data object CloseIncident : NjordAction
@@ -134,10 +136,15 @@ sealed interface NjordAction {
     data object HomeError : NjordAction
 }
 
-private fun mergeIncidentsById(existing: List<Incident>, incoming: List<Incident>): List<Incident> {
-    if (incoming.isEmpty()) return existing
-    val existingIds = existing.mapTo(mutableSetOf()) { it.id }
-    return existing + incoming.filter { it.id !in existingIds }
+private fun mergeIncidentsById(
+    existing: List<Incident>,
+    incoming: List<Incident>,
+    dismissedIds: Set<String> = emptySet()
+): List<Incident> {
+    val visibleExisting = existing.filterNot { it.id in dismissedIds }
+    if (incoming.isEmpty()) return visibleExisting
+    val existingIds = visibleExisting.mapTo(mutableSetOf()) { it.id }
+    return visibleExisting + incoming.filter { it.id !in dismissedIds && it.id !in existingIds }
 }
 
 fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
@@ -154,14 +161,22 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         is NjordAction.SetLogFilter -> state.copy(logFilter = action.filter)
         is NjordAction.SetLogQuery -> state.copy(logQuery = action.query)
         is NjordAction.SetLogStrategyFilter -> state.copy(logStrategyFilter = action.filter)
-        is NjordAction.IncidentsSeeded -> state.copy(liveIncidents = action.incidents)
+        is NjordAction.IncidentAcknowledgementsLoaded -> state.copy(
+            dismissedIncidentIds = action.incidentIds,
+            liveIncidents = state.liveIncidents.filterNot { it.id in action.incidentIds },
+            selectedIncident = state.selectedIncident?.takeUnless { it.id in action.incidentIds }
+        )
+        is NjordAction.IncidentsSeeded -> state.copy(
+            liveIncidents = mergeIncidentsById(emptyList(), action.incidents, state.dismissedIncidentIds)
+        )
         is NjordAction.IncidentsReceived -> state.copy(
-            liveIncidents = mergeIncidentsById(state.liveIncidents, action.incidents)
+            liveIncidents = mergeIncidentsById(state.liveIncidents, action.incidents, state.dismissedIncidentIds)
         )
         is NjordAction.SelectIncident -> state.copy(selectedIncident = action.incident)
         NjordAction.CloseIncident -> state.copy(selectedIncident = null)
         is NjordAction.DismissIncident -> state.copy(
             liveIncidents = state.liveIncidents.filterNot { it.id == action.incidentId },
+            dismissedIncidentIds = state.dismissedIncidentIds + action.incidentId,
             selectedIncident = null
         )
 
@@ -179,7 +194,7 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         is NjordAction.LiveLoaded -> state.copy(
             livePositions = action.positions,
             liveAnalytics = action.analytics,
-            liveIncidents = mergeIncidentsById(state.liveIncidents, action.incidents),
+            liveIncidents = mergeIncidentsById(state.liveIncidents, action.incidents, state.dismissedIncidentIds),
             liveLoading = false,
             liveError = false
         )
@@ -214,8 +229,10 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         NjordAction.PerformanceError -> state.copy(performanceLoading = false, performanceError = true)
         NjordAction.HomeLoading -> state.copy(homeLoading = true, homeError = false)
         is NjordAction.HomeLoaded -> state.copy(
-            homeSnapshot = action.snapshot,
-            liveIncidents = mergeIncidentsById(state.liveIncidents, action.snapshot.incidents),
+            homeSnapshot = action.snapshot.copy(
+                incidents = action.snapshot.incidents.filterNot { it.id in state.dismissedIncidentIds }
+            ),
+            liveIncidents = mergeIncidentsById(state.liveIncidents, action.snapshot.incidents, state.dismissedIncidentIds),
             homeLoading = false,
             homeError = false
         )

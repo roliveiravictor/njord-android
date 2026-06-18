@@ -60,8 +60,11 @@ when (val result = NjordApiClient.fetchPortfolioPayload(...)) {
 }
 ```
 
-The `Incidents` cache is intentionally not cleared by a network refresh — it
-accumulates across sessions until the user explicitly dismisses each incident.
+The `Incidents` cache is intentionally not cleared by a network refresh. When a
+user dismisses an incident, the app records the incident ID in the
+`IncidentAcknowledgements` cache for 24 hours, removes it from the visible
+incident cache, and filters matching home/live API responses until that local
+acknowledgement expires.
 
 ## Stack
 

@@ -532,7 +532,7 @@ class NjordApiClientTest {
         val snapshot = mapApiPerformance(response)
 
         assertEquals("\$18.4K", snapshot.totalEquity)
-        assertEquals("ALL +84.2%", snapshot.returnBadge)
+        assertEquals("+84.2%", snapshot.returnBadge)
         assertEquals("-\$428.00", snapshot.unrealizedPnl)
         assertEquals(Tone.Danger, snapshot.unrealizedTone)
         assertEquals("+\$96.00", snapshot.todayPnl)

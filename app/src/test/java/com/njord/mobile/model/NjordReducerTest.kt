@@ -50,7 +50,46 @@ class NjordReducerTest {
         )
 
         assertFalse(state.liveIncidents.any { it.id == incident.id })
+        assertTrue(incident.id in state.dismissedIncidentIds)
         assertNull(state.selectedIncident)
+    }
+
+    @Test
+    fun liveLoaded_ignoresDismissedIncidentsFromServerRefresh() {
+        val incident = ReducerFixtures.incidents.first()
+        val position = ReducerFixtures.livePositions.first()
+        val state = reduce(
+            NjordUiState(dismissedIncidentIds = setOf(incident.id)),
+            NjordAction.LiveLoaded(listOf(position), null, listOf(incident))
+        )
+
+        assertTrue(state.liveIncidents.isEmpty())
+    }
+
+    @Test
+    fun homeLoaded_ignoresDismissedIncidentsFromServerRefresh() {
+        val incident = ReducerFixtures.incidents.first()
+        val snapshot = ReducerFixtures.homeSnapshot.copy(incidents = listOf(incident))
+        val state = reduce(
+            NjordUiState(dismissedIncidentIds = setOf(incident.id)),
+            NjordAction.HomeLoaded(snapshot)
+        )
+
+        assertTrue(state.liveIncidents.isEmpty())
+        assertTrue(state.homeSnapshot?.incidents.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun acknowledgedIncidentsLoaded_filtersSeededIncidents() {
+        val incident = ReducerFixtures.incidents.first()
+        val loaded = reduce(
+            NjordUiState(selectedIncident = incident, liveIncidents = listOf(incident)),
+            NjordAction.IncidentAcknowledgementsLoaded(setOf(incident.id))
+        )
+        val seeded = reduce(loaded, NjordAction.IncidentsSeeded(listOf(incident)))
+
+        assertTrue(seeded.liveIncidents.isEmpty())
+        assertNull(seeded.selectedIncident)
     }
 
     @Test
@@ -331,6 +370,22 @@ private object ReducerFixtures {
             age = "8m",
             reason = "Margin"
         )
+    )
+
+    val homeSnapshot = HomeSnapshot(
+        totalBalance = "\$18.4k",
+        unrealizedPnl = "+\$42",
+        unrealizedPnlPct = "+0.2%",
+        availableMargin = "\$12.1k",
+        inUse = "\$6.3k",
+        marginInUse = "34%",
+        openPositionCount = "2",
+        strategies = emptyList(),
+        activitySummary = null,
+        heartbeatHealthy = 7,
+        heartbeatTotal = 8,
+        heartbeatLateCount = 1,
+        incidents = emptyList()
     )
 
     val hunchReport = HunchReport(

@@ -67,8 +67,9 @@ class NjordAppTest {
         compose.onNodeWithText("Live metrics").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("REALIZED P&L").assertIsDisplayed()
         compose.onNodeWithText("UNREALIZED P&L").assertIsDisplayed()
-        compose.onNodeWithText("Monthly stats").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Performance history").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("P&L over time").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Return by month").performScrollTo().assertIsDisplayed()
     }
 
     @Test

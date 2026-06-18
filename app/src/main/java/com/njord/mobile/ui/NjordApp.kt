@@ -122,6 +122,7 @@ import com.njord.mobile.api.ApiPayloadResult
 import com.njord.mobile.api.HeartbeatResult
 import com.njord.mobile.api.HomeResult
 import com.njord.mobile.api.HunchReportResult
+import com.njord.mobile.api.IncidentAcknowledgements
 import com.njord.mobile.api.LiveResult
 import com.njord.mobile.api.LogsResult
 import com.njord.mobile.api.NjordApiCache
@@ -249,6 +250,10 @@ fun NjordApp() {
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
+            val acknowledgedIds = IncidentAcknowledgements.readActiveIds(context.filesDir)
+            withContext(Dispatchers.Main) {
+                state = reduce(state, NjordAction.IncidentAcknowledgementsLoaded(acknowledgedIds))
+            }
             NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)?.let { json ->
                 val seeded = parseIncidentsFromJson(json)
                 if (seeded.isNotEmpty()) {
@@ -369,6 +374,7 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 onClose = { onAction(NjordAction.CloseIncident) },
                 onDismissIncident = {
                     scope.launch(Dispatchers.IO) {
+                        IncidentAcknowledgements.acknowledge(context.filesDir, incident.id)
                         NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)?.let { json ->
                             val updated = NjordApiClient.deleteFromIncidentJson(json, incident.id)
                             NjordApiCache.write(context.filesDir, ApiCacheKey.Incidents, updated)
@@ -472,9 +478,14 @@ private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Un
             when (val parsed = NjordApiClient.parseHomeResponse(result.body)) {
                 is HomeResult.Success -> {
                     NjordApiCache.write(context.filesDir, ApiCacheKey.Home, result.body)
-                    val snapshot = mapApiHome(parsed.response)
+                    val acknowledgedIds = IncidentAcknowledgements.readActiveIds(context.filesDir)
+                    val mappedSnapshot = mapApiHome(parsed.response)
+                    val snapshot = mappedSnapshot.copy(incidents = mappedSnapshot.incidents.filterNot { it.id in acknowledgedIds })
                     if (snapshot.incidents.isNotEmpty()) {
-                        val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
+                        val incomingJson = IncidentAcknowledgements.filterIncidentJson(
+                            NjordApiClient.extractIncidentsJson(result.body),
+                            acknowledgedIds
+                        )
                         val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
                         NjordApiCache.write(
                             context.filesDir,
@@ -522,9 +533,14 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
             when (val parsed = NjordApiClient.parseLiveResponse(result.body)) {
                 is LiveResult.Success -> {
                     NjordApiCache.write(context.filesDir, cacheKey, result.body)
-                    val (livePositions, liveAnalytics, liveIncidents) = mapApiLive(parsed.response)
+                    val acknowledgedIds = IncidentAcknowledgements.readActiveIds(context.filesDir)
+                    val (livePositions, liveAnalytics, mappedLiveIncidents) = mapApiLive(parsed.response)
+                    val liveIncidents = mappedLiveIncidents.filterNot { it.id in acknowledgedIds }
                     if (liveIncidents.isNotEmpty()) {
-                        val incomingJson = NjordApiClient.extractIncidentsJson(result.body)
+                        val incomingJson = IncidentAcknowledgements.filterIncidentJson(
+                            NjordApiClient.extractIncidentsJson(result.body),
+                            acknowledgedIds
+                        )
                         val existingJson = NjordApiCache.read(context.filesDir, ApiCacheKey.Incidents)
                         NjordApiCache.write(
                             context.filesDir,
@@ -805,12 +821,11 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             PerformanceHero(snapshot, state.performanceStrategyFilter)
             SectionTitle("Live metrics")
             PerformanceMetricGrid(snapshot.liveMetrics)
-            SectionTitle("Monthly stats")
-            PerformanceMonthlyStats(snapshot.monthlyStats)
             SectionTitle("Performance history")
+            PerformanceMonthlyStats(snapshot.monthlyStats)
+            ReturnByMonthCard(snapshot)
             PerformanceHistoryCard(
-                title = "Performance P&L over time",
-                trailing = "30D trend",
+                title = "P&L over time",
                 stats = snapshot.equityStats
             ) {
                 ChartCanvas(
@@ -821,7 +836,6 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
                 )
             }
             DrawdownHistoryCard(snapshot)
-            ReturnByMonthCard(snapshot)
         }
     }
 }
@@ -1347,24 +1361,24 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
             .padding(22.dp)
             .testTag("performanceHero")
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
-                val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
-                Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(7.dp))
-                Text(snapshot.totalEquity, color = Success, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            Column(horizontalAlignment = Alignment.End) {
+        Column {
+            val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
+            Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(7.dp))
+            Text(snapshot.totalEquity, color = Success, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    snapshot.unrealizedPnl,
-                    color = toneColor(snapshot.unrealizedTone),
+                    snapshot.returnBadge,
+                    color = toneColor(snapshot.returnTone),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text("Unrealized", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(8.dp))
+                Text("all time", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(Modifier.height(28.dp))
@@ -1402,22 +1416,26 @@ private fun PerformanceMonthlyStats(stats: List<PerformanceMetric>) {
 @Composable
 private fun PerformanceHistoryCard(
     title: String,
-    trailing: String,
+    trailing: String? = null,
     stats: List<PerformanceMetric>,
     content: @Composable () -> Unit
 ) {
     NjordCard {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-            Text(trailing, color = TextMuted, fontSize = 12.sp)
+            trailing?.let { Text(it, color = TextMuted, fontSize = 12.sp) }
         }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            stats.forEach { stat ->
-                PerformanceStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
+        if (stats.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                stats.forEach { stat ->
+                    PerformanceStatTile(stat.label, stat.value, stat.tone, stat.subtext, Modifier.weight(1f))
+                }
             }
+            Spacer(Modifier.height(14.dp))
+        } else {
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.height(14.dp))
         content()
     }
 }
@@ -1451,7 +1469,6 @@ private fun PerformanceStatTile(
 private fun DrawdownHistoryCard(snapshot: PerformanceSnapshot) {
     PerformanceHistoryCard(
         title = "Drawdown",
-        trailing = "Risk depth",
         stats = snapshot.drawdownStats
     ) {
         ChartCanvas(
@@ -1467,8 +1484,7 @@ private fun DrawdownHistoryCard(snapshot: PerformanceSnapshot) {
 private fun ReturnByMonthCard(snapshot: PerformanceSnapshot) {
     PerformanceHistoryCard(
         title = "Return by month",
-        trailing = "6-month view",
-        stats = snapshot.monthlyStats
+        stats = emptyList()
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             snapshot.monthlyReturns.forEach { month ->
@@ -2563,7 +2579,11 @@ private fun ChartCanvas(
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent()
-                                val position = event.changes.firstOrNull()?.position ?: continue
+                                val position = event.changes.firstOrNull { it.pressed }?.position
+                                if (position == null) {
+                                    selectedPointIndex = null
+                                    continue
+                                }
                                 selectedPointIndex = nearestChartPointIndex(chartPoints, canvasSize, position)
                             }
                         }
