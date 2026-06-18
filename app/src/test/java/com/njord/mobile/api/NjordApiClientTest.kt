@@ -533,11 +533,16 @@ class NjordApiClientTest {
 
         assertEquals("\$18.4K", snapshot.totalEquity)
         assertEquals("ALL +84.2%", snapshot.returnBadge)
+        assertEquals("-\$428.00", snapshot.unrealizedPnl)
+        assertEquals(Tone.Danger, snapshot.unrealizedTone)
         assertEquals("+\$96.00", snapshot.todayPnl)
         assertEquals("-\$428.00", snapshot.liveMetrics[1].value)
         assertEquals("56.0%", snapshot.liveMetrics[2].value)
         assertEquals("May", snapshot.monthlyReturns[0].month)
         assertEquals(2, snapshot.equityCurve.size)
+        assertEquals("$16,000.00", snapshot.equityCurve[0].valueLabel)
+        assertEquals("May 10", snapshot.equityCurve[0].pointLabel)
+        assertEquals("-2.1%", snapshot.drawdownCurve[1].valueLabel)
         assertEquals("-2.1%", snapshot.drawdownStats[0].value)
     }
 

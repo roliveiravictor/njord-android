@@ -24,7 +24,7 @@ enum class ApiCacheKey(val fileName: String) {
 
 object NjordApiCache {
     private const val CacheDirectoryName = "api-cache"
-    private const val DefaultMaxAgeMillis = 5 * 60 * 1000L
+    private const val DefaultMaxAgeMillis = 60 * 1000L
 
     fun read(filesDir: File, key: ApiCacheKey): String? =
         runCatching {
@@ -39,7 +39,6 @@ object NjordApiCache {
             if (!file.exists()) return@runCatching null
             val ageMillis = System.currentTimeMillis() - file.lastModified()
             if (ageMillis > maxAgeMillis) {
-                delete(filesDir, key)
                 return@runCatching null
             }
             file.readText()

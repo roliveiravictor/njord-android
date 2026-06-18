@@ -130,6 +130,8 @@ class NjordReducerTest {
             totalEquity = "\$18.4k",
             returnBadge = "ALL +84.2%",
             returnTone = Tone.Success,
+            unrealizedPnl = "-\$428",
+            unrealizedTone = Tone.Danger,
             todayPnl = "+\$96",
             todayPct = "+0.5%",
             todayTone = Tone.Success,

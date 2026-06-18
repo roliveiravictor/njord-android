@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -90,8 +91,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -99,6 +103,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import com.njord.mobile.model.ActivityAction
 import com.njord.mobile.model.Destination
@@ -152,6 +158,8 @@ import com.njord.mobile.model.visibleLogs
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -436,15 +444,25 @@ private suspend fun showApiParseFailureToast(context: Context, payload: ApiPaylo
 }
 
 private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+    suspend fun renderCachedHome(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseHomeResponse(cachedBody)) {
             is HomeResult.Success -> {
                 val snapshot = mapApiHome(cached.response).copy(incidents = emptyList())
                 dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
+                true
             }
-            is HomeResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Home)
-            else -> {}
+            is HomeResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.Home)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+        if (renderCachedHome(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Home)?.let { cachedBody ->
+        renderCachedHome(cachedBody)
     }
     when (val result = NjordApiClient.fetchHomePayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -475,15 +493,25 @@ private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Un
 }
 
 private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Unit, strategy: String = "all", cacheKey: ApiCacheKey = ApiCacheKey.Live) {
-    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+    suspend fun renderCachedLive(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseLiveResponse(cachedBody)) {
             is LiveResult.Success -> {
                 val (cachedPositions, cachedAnalytics, _) = mapApiLive(cached.response)
                 dispatchUiAction(onAction, NjordAction.LiveLoaded(cachedPositions, cachedAnalytics, emptyList()))
+                true
             }
-            is LiveResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
-            else -> {}
+            is LiveResult.Error -> {
+                NjordApiCache.delete(context.filesDir, cacheKey)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { cachedBody ->
+        if (renderCachedLive(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+        renderCachedLive(cachedBody)
     }
     when (val result = NjordApiClient.fetchLivePayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -516,12 +544,24 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
 
 
 private suspend fun loadPerformanceData(context: Context, onAction: (NjordAction) -> Unit, strategy: String, cacheKey: ApiCacheKey) {
-    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+    suspend fun renderCachedPerformance(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parsePerformanceResponse(cachedBody)) {
-            is PerformanceResult.Success -> dispatchUiAction(onAction, NjordAction.PerformanceLoaded(mapApiPerformance(cached.response)))
-            is PerformanceResult.Error -> NjordApiCache.delete(context.filesDir, cacheKey)
-            else -> {}
+            is PerformanceResult.Success -> {
+                dispatchUiAction(onAction, NjordAction.PerformanceLoaded(mapApiPerformance(cached.response)))
+                true
+            }
+            is PerformanceResult.Error -> {
+                NjordApiCache.delete(context.filesDir, cacheKey)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, cacheKey)?.let { cachedBody ->
+        if (renderCachedPerformance(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, cacheKey)?.let { cachedBody ->
+        renderCachedPerformance(cachedBody)
     }
     when (val result = NjordApiClient.fetchPerformancePayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -543,15 +583,25 @@ private suspend fun loadPerformanceData(context: Context, onAction: (NjordAction
 }
 
 private suspend fun loadActivityData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+    suspend fun renderCachedActivity(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseActivityResponse(cachedBody)) {
             is ActivityResult.Success -> {
                 val (summary, cycles) = mapApiActivity(cached.response)
                 dispatchUiAction(onAction, NjordAction.ActivityLoaded(summary, cycles))
+                true
             }
-            is ActivityResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Activity)
-            else -> {}
+            is ActivityResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.Activity)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+        if (renderCachedActivity(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Activity)?.let { cachedBody ->
+        renderCachedActivity(cachedBody)
     }
     when (val result = NjordApiClient.fetchActivityPayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -573,7 +623,7 @@ private suspend fun loadActivityData(context: Context, onAction: (NjordAction) -
 }
 
 private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+    suspend fun renderCachedHeartbeat(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseHeartbeatResponse(cachedBody)) {
             is HeartbeatResult.Success -> {
                 val snapshot = mapApiHeartbeat(cached)
@@ -587,10 +637,20 @@ private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) 
                         totalCount = snapshot.totalCount
                     )
                 )
+                true
             }
-            is HeartbeatResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Heartbeat)
-            else -> {}
+            is HeartbeatResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.Heartbeat)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+        if (renderCachedHeartbeat(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Heartbeat)?.let { cachedBody ->
+        renderCachedHeartbeat(cachedBody)
     }
     when (val result = NjordApiClient.fetchHeartbeatPayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -621,12 +681,24 @@ private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) 
 }
 
 private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+    suspend fun renderCachedLogs(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseLogsResponse(cachedBody)) {
-            is LogsResult.Success -> dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
-            is LogsResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
-            else -> {}
+            is LogsResult.Success -> {
+                dispatchUiAction(onAction, NjordAction.LogsLoaded(mapApiEntries(cached.entries)))
+                true
+            }
+            is LogsResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.Logs)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+        if (renderCachedLogs(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, ApiCacheKey.Logs)?.let { cachedBody ->
+        renderCachedLogs(cachedBody)
     }
     when (val result = NjordApiClient.fetchLogsPayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -647,12 +719,24 @@ private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Un
 }
 
 private suspend fun loadHunchReportData(context: Context, onAction: (NjordAction) -> Unit) {
-    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+    suspend fun renderCachedHunchReport(cachedBody: String): Boolean =
         when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
-            is HunchReportResult.Success -> dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
-            is HunchReportResult.Error -> NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
-            else -> {}
+            is HunchReportResult.Success -> {
+                dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
+                true
+            }
+            is HunchReportResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
+                false
+            }
+            else -> false
         }
+
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+        if (renderCachedHunchReport(cachedBody)) return
+    }
+    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
+        renderCachedHunchReport(cachedBody)
     }
     when (val result = NjordApiClient.fetchHunchReportPayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
@@ -1263,7 +1347,7 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
             .padding(22.dp)
             .testTag("performanceHero")
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
                 Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
@@ -1271,13 +1355,16 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
                 Text(snapshot.totalEquity, color = Success, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(toneColor(snapshot.returnTone).copy(alpha = 0.22f))
-                    .padding(horizontal = 11.dp, vertical = 6.dp)
-            ) {
-                Text(snapshot.returnBadge, color = Color(0xFFBFD0FF), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    snapshot.unrealizedPnl,
+                    color = toneColor(snapshot.unrealizedTone),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text("Unrealized", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(Modifier.height(28.dp))
@@ -2455,6 +2542,10 @@ private fun ChartCanvas(
 ) {
     val chartPoints = points
     val lineColor = if (positive) Success else Danger
+    val density = LocalDensity.current
+    var selectedPointIndex by remember(chartPoints) { mutableStateOf<Int?>(null) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    val selectedPoint = selectedPointIndex?.let { chartPoints.getOrNull(it) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -2462,34 +2553,78 @@ private fun ChartCanvas(
             .background(Color.Black.copy(alpha = 0.10f))
             .padding(8.dp)
     ) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2.75f)
-        ) {
-            val w = size.width
-            val h = size.height
-            repeat(3) { idx ->
-                val y = h * (idx + 1) / 4f
-                drawLine(Color.White.copy(alpha = 0.08f), Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
-            }
-            val path = Path()
-            chartPoints.forEachIndexed { index, point ->
-                val offset = Offset(point.x * w, point.y * h)
-                if (index == 0) path.moveTo(offset.x, offset.y) else path.lineTo(offset.x, offset.y)
-            }
-            if (showFill) {
-                val fillPath = Path()
+        Box(Modifier.fillMaxWidth()) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2.75f)
+                    .onSizeChanged { canvasSize = it }
+                    .pointerInput(chartPoints, canvasSize) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val position = event.changes.firstOrNull()?.position ?: continue
+                                selectedPointIndex = nearestChartPointIndex(chartPoints, canvasSize, position)
+                            }
+                        }
+                    }
+            ) {
+                val w = size.width
+                val h = size.height
+                repeat(3) { idx ->
+                    val y = h * (idx + 1) / 4f
+                    drawLine(Color.White.copy(alpha = 0.08f), Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
+                }
+                val path = Path()
                 chartPoints.forEachIndexed { index, point ->
                     val offset = Offset(point.x * w, point.y * h)
-                    if (index == 0) fillPath.moveTo(offset.x, offset.y) else fillPath.lineTo(offset.x, offset.y)
+                    if (index == 0) path.moveTo(offset.x, offset.y) else path.lineTo(offset.x, offset.y)
                 }
-                fillPath.lineTo(w, h)
-                fillPath.lineTo(0f, h)
-                fillPath.close()
-                drawPath(fillPath, lineColor.copy(alpha = 0.18f))
+                if (showFill) {
+                    val fillPath = Path()
+                    chartPoints.forEachIndexed { index, point ->
+                        val offset = Offset(point.x * w, point.y * h)
+                        if (index == 0) fillPath.moveTo(offset.x, offset.y) else fillPath.lineTo(offset.x, offset.y)
+                    }
+                    fillPath.lineTo(w, h)
+                    fillPath.lineTo(0f, h)
+                    fillPath.close()
+                    drawPath(fillPath, lineColor.copy(alpha = 0.18f))
+                }
+                drawPath(path, lineColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                selectedPoint?.let { point ->
+                    val selectedOffset = Offset(point.x * w, point.y * h)
+                    drawLine(
+                        Color.White.copy(alpha = 0.22f),
+                        Offset(selectedOffset.x, 0f),
+                        Offset(selectedOffset.x, h),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawCircle(Color.Black.copy(alpha = 0.58f), radius = 7.dp.toPx(), center = selectedOffset)
+                    drawCircle(lineColor, radius = 4.dp.toPx(), center = selectedOffset)
+                }
             }
-            drawPath(path, lineColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            selectedPoint?.takeIf { it.valueLabel.isNotBlank() }?.let { point ->
+                val labelWidthPx = with(density) { 112.dp.roundToPx() }
+                val labelX = (point.x * canvasSize.width - labelWidthPx / 2f)
+                    .roundToInt()
+                    .coerceIn(0, (canvasSize.width - labelWidthPx).coerceAtLeast(0))
+                Column(
+                    modifier = Modifier
+                        .offset { IntOffset(labelX, 6.dp.roundToPx()) }
+                        .width(112.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.72f))
+                        .border(1.dp, lineColor.copy(alpha = 0.42f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .testTag("chartValueTooltip")
+                ) {
+                    Text(point.valueLabel, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (point.pointLabel.isNotBlank()) {
+                        Text(point.pointLabel, color = TextMuted2, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
         if (axisLabels.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
@@ -2499,6 +2634,14 @@ private fun ChartCanvas(
                 }
             }
         }
+    }
+}
+
+private fun nearestChartPointIndex(points: List<ChartPoint>, canvasSize: IntSize, position: Offset): Int? {
+    if (points.isEmpty() || canvasSize.width <= 0 || canvasSize.height <= 0) return null
+    val boundedX = position.x.coerceIn(0f, canvasSize.width.toFloat())
+    return points.indices.minByOrNull { index ->
+        abs(points[index].x * canvasSize.width - boundedX)
     }
 }
 

@@ -284,6 +284,8 @@ data class PerformanceSnapshot(
     val totalEquity: String,
     val returnBadge: String,
     val returnTone: Tone,
+    val unrealizedPnl: String,
+    val unrealizedTone: Tone,
     val todayPnl: String,
     val todayPct: String,
     val todayTone: Tone,
@@ -397,7 +399,12 @@ data class LogEntry(
 
 data class ActivityAction(val label: String, val symbol: String, val side: String)
 data class StrategyCycle(val strategy: String, val actions: List<ActivityAction>)
-data class ChartPoint(val x: Float, val y: Float)
+data class ChartPoint(
+    val x: Float,
+    val y: Float,
+    val valueLabel: String = "",
+    val pointLabel: String = ""
+)
 data class ReportFactor(val text: String, val isRisk: Boolean = false)
 data class LayerScore(val name: String, val score: String, val tone: Tone)
 data class HunchReport(

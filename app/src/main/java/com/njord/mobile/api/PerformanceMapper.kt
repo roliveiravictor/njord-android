@@ -31,6 +31,8 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
         totalEquity = formatCompactCurrency(response.totalEquity),
         returnBadge = "ALL ${formatSignedPercent(response.allTimeReturnPct)}",
         returnTone = toneFor(response.allTimeReturnPct),
+        unrealizedPnl = formatSignedCurrency(response.liveMetrics.unrealizedPnl),
+        unrealizedTone = toneFor(response.liveMetrics.unrealizedPnl),
         todayPnl = formatSignedCurrency(todayPnlValue),
         todayPct = response.performanceStrip.todayPnlPct?.let(::formatSignedPercent)
             ?: if (todayPnlKnown) "No baseline" else "Intraday",
@@ -57,14 +59,23 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
             PerformanceMetric("Peak Return", formatSignedPercent(peakReturn), toneFor(peakReturn)),
             PerformanceMetric("30D P&L", response.performanceStrip.thirtyDayPnl?.let(::formatSignedCurrency) ?: "N/A", toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0))
         ),
-        equityCurve = normalizeSeries(response.equityCurve.map { it.equity }),
+        equityCurve = normalizeSeries(
+            values = response.equityCurve.map { it.equity },
+            valueLabels = response.equityCurve.map { formatCurrency(it.equity) },
+            pointLabels = response.equityCurve.map { formatAxisDate(it.timestamp) }
+        ),
         equityAxisLabels = axisLabels(response.equityCurve.map { it.timestamp }, fallbackEnd = "Today"),
         drawdownStats = listOf(
             PerformanceMetric("Current", formatDrawdown(response.currentDrawdownPct), toneForDrawdown(response.currentDrawdownPct)),
             PerformanceMetric("Max", formatDrawdown(response.maxDrawdownPct), toneForDrawdown(response.maxDrawdownPct)),
             PerformanceMetric("Recovery", "${formatNumber(response.recoveryPct)}%")
         ),
-        drawdownCurve = normalizeSeries(response.drawdownSeries.map { abs(it.drawdownPct) }, invert = false),
+        drawdownCurve = normalizeSeries(
+            values = response.drawdownSeries.map { abs(it.drawdownPct) },
+            valueLabels = response.drawdownSeries.map { formatDrawdown(it.drawdownPct) },
+            pointLabels = response.drawdownSeries.map { formatAxisDate(it.timestamp) },
+            invert = false
+        ),
         drawdownAxisLabels = axisLabels(response.drawdownSeries.map { it.timestamp }, fallbackStart = "0%", fallbackEnd = "Recovery"),
         monthlyReturns = monthlyReturns
     )
@@ -82,9 +93,21 @@ private fun mapMonthlyReturns(returns: List<PerformanceMonthlyReturnApiResponse>
     }
 }
 
-private fun normalizeSeries(values: List<Double>, invert: Boolean = true): List<ChartPoint> {
+private fun normalizeSeries(
+    values: List<Double>,
+    valueLabels: List<String> = values.map(::formatNumber),
+    pointLabels: List<String> = emptyList(),
+    invert: Boolean = true
+): List<ChartPoint> {
     if (values.isEmpty()) return emptyList()
-    if (values.size == 1) return listOf(ChartPoint(0f, 0.5f), ChartPoint(1f, 0.5f))
+    if (values.size == 1) {
+        val valueLabel = valueLabels.firstOrNull().orEmpty()
+        val pointLabel = pointLabels.firstOrNull().orEmpty()
+        return listOf(
+            ChartPoint(0f, 0.5f, valueLabel, pointLabel),
+            ChartPoint(1f, 0.5f, valueLabel, pointLabel)
+        )
+    }
     val min = values.minOrNull() ?: 0.0
     val max = values.maxOrNull() ?: min
     val range = (max - min).takeIf { it > 0.0 } ?: 1.0
@@ -92,7 +115,9 @@ private fun normalizeSeries(values: List<Double>, invert: Boolean = true): List<
         val normalized = ((value - min) / range).toFloat()
         ChartPoint(
             x = index.toFloat() / (values.lastIndex).toFloat(),
-            y = if (invert) 0.86f - normalized * 0.72f else 0.14f + normalized * 0.72f
+            y = if (invert) 0.86f - normalized * 0.72f else 0.14f + normalized * 0.72f,
+            valueLabel = valueLabels.getOrNull(index).orEmpty(),
+            pointLabel = pointLabels.getOrNull(index).orEmpty()
         )
     }
 }
@@ -118,6 +143,9 @@ private fun formatSignedCurrency(value: Double): String {
     val formatted = USD_FORMATTER.format(abs(value))
     return if (value < 0.0) "-$formatted" else "+$formatted"
 }
+
+private fun formatCurrency(value: Double): String =
+    USD_FORMATTER.format(value)
 
 private fun formatCompactCurrency(value: Double): String {
     val absValue = abs(value)

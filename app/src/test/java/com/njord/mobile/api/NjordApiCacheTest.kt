@@ -34,16 +34,17 @@ class NjordApiCacheTest {
     }
 
     @Test
-    fun readFresh_staleFileReturnsNullAndDeletesCache() {
+    fun readFresh_staleFileReturnsNullAndKeepsCache() {
         val filesDir = temporaryFolder.newFolder("files")
         val body = """{"cycles":[]}"""
 
         assertTrue(NjordApiCache.write(filesDir, ApiCacheKey.Activity, body))
         val file = NjordApiCache.fileFor(filesDir, ApiCacheKey.Activity)
-        assertTrue(file.setLastModified(System.currentTimeMillis() - 10 * 60 * 1000L))
+        assertTrue(file.setLastModified(System.currentTimeMillis() - 61 * 1000L))
 
         assertNull(NjordApiCache.readFresh(filesDir, ApiCacheKey.Activity))
-        assertFalse(file.exists())
+        assertTrue(file.exists())
+        assertEquals(body, NjordApiCache.read(filesDir, ApiCacheKey.Activity))
     }
 
     @Test
