@@ -89,6 +89,13 @@ data class HomeApiHeartbeat(
     val lateCount: Int
 )
 
+data class HomeApiLogs(
+    val warningCount: Int,
+    val errorCount: Int,
+    val totalCount: Int,
+    val hours: Int
+)
+
 data class HomeApiResponse(
     val totalBalance: Double,
     val availableMargin: Double,
@@ -100,6 +107,7 @@ data class HomeApiResponse(
     val strategies: List<HomeApiStrategy>,
     val latestCycle: HomeApiCycle?,
     val heartbeat: HomeApiHeartbeat,
+    val logs: HomeApiLogs,
     val incidents: List<LiveApiIncident>
 )
 
@@ -389,6 +397,7 @@ object NjordApiClient {
             val heartbeatObject = root.optJSONObject("heartbeat")
                 ?: return HomeResult.Error("Missing 'heartbeat' key")
             val latestCycleObject = root.optJSONObject("latest_cycle")
+            val logsObject = root.optJSONObject("logs")
             val incidentsArray = root.optJSONArray("incidents")
             val strategies = (0 until strategiesArray.length()).mapNotNull { i ->
                 val obj = strategiesArray.optJSONObject(i) ?: return@mapNotNull null
@@ -423,6 +432,12 @@ object NjordApiClient {
                         healthy = heartbeatObject.optInt("healthy", 0),
                         total = heartbeatObject.optInt("total", 0),
                         lateCount = heartbeatObject.optInt("late_count", 0)
+                    ),
+                    logs = HomeApiLogs(
+                        warningCount = logsObject?.optInt("warning_count", 0) ?: 0,
+                        errorCount = logsObject?.optInt("error_count", 0) ?: 0,
+                        totalCount = logsObject?.optInt("total_count", 0) ?: 0,
+                        hours = logsObject?.optInt("hours", 24) ?: 24
                     ),
                     incidents = (0 until (incidentsArray?.length() ?: 0)).mapNotNull { i ->
                         incidentsArray?.optJSONObject(i)?.let(::parseLiveIncident)

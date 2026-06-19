@@ -141,6 +141,7 @@ import com.njord.mobile.api.parseIncidentsFromJson
 import com.njord.mobile.model.ActivitySummary
 import com.njord.mobile.model.ChartPoint
 import com.njord.mobile.model.HomeSnapshot
+import com.njord.mobile.model.HomeLogsSummary
 import com.njord.mobile.model.HunchReport
 import com.njord.mobile.model.NjordUiState
 import com.njord.mobile.model.PerformanceMetric
@@ -794,6 +795,9 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         SectionTitle("Heartbeat")
         HomeHeartbeatCard(snapshot) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
 
+        SectionTitle("Logs")
+        HomeLogsCard(snapshot?.logsSummary) { onAction(NjordAction.Navigate(Destination.Logs)) }
+
         if (state.liveIncidents.isNotEmpty()) {
             SectionTitle("Incidents")
             HomeIncidentsCard(
@@ -1365,21 +1369,19 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
             val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
             Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.height(7.dp))
-            Text(snapshot.totalEquity, color = Success, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
-            Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    snapshot.returnBadge,
-                    color = toneColor(snapshot.returnTone),
-                    fontSize = 22.sp,
+                    snapshot.totalEquity,
+                    color = Success,
+                    fontSize = 38.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("all time", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("${snapshot.returnBadge} all time", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
+            Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         }
         Spacer(Modifier.height(28.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1615,16 +1617,36 @@ private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, onClick: () -> Unit) {
         else -> "$lateCount late"
     }
     val badgeTone = if (lateCount == 0 && total > 0) Tone.Success else Tone.Warning
+    val allHeartbeatsFine = total > 0 && healthy == total && lateCount == 0
+    val accountabilityIncomplete = total > 0 && !allHeartbeatsFine
+    val gradientColors = when {
+        allHeartbeatsFine -> listOf(
+            Color(0xFF141B1A),
+            Color(0xFF17231C),
+            Color(0xFF12301E)
+        )
+        accountabilityIncomplete -> listOf(
+            Color(0xFF171820),
+            Color(0xFF1E1B1E),
+            Color(0xFF2B2418)
+        )
+        else -> listOf(
+            Color(0xFF151A21),
+            Color(0xFF171C24),
+            Color(0xFF1B2028)
+        )
+    }
+    val borderColor = when {
+        allHeartbeatsFine -> Success.copy(alpha = 0.36f)
+        accountabilityIncomplete -> Warning.copy(alpha = 0.36f)
+        else -> Outline.copy(alpha = 0.65f)
+    }
     HomeGradientCard(
         modifier = Modifier.testTag("homeHeartbeatCard"),
         gradient = Brush.linearGradient(
-            colors = listOf(
-                Color(0xFF171820),
-                Color(0xFF1E1B1E),
-                Color(0xFF2B2418)
-            )
+            colors = gradientColors
         ),
-        borderColor = Warning.copy(alpha = 0.36f),
+        borderColor = borderColor,
         onClick = onClick
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1636,6 +1658,66 @@ private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, onClick: () -> Unit) {
             Text("$healthy/$total", color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.width(8.dp))
             Badge(badge, badgeTone)
+        }
+    }
+}
+
+@Composable
+private fun HomeLogsCard(summary: HomeLogsSummary?, onClick: () -> Unit) {
+    val warningCount = summary?.warningCount ?: 0
+    val errorCount = summary?.errorCount ?: 0
+    val totalCount = summary?.totalCount ?: 0
+    val hours = summary?.hours ?: 24
+
+    @Composable
+    fun Content() {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Latest ${hours}h", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+            Badge("View logs", when {
+                errorCount > 0 -> Tone.Danger
+                warningCount > 0 -> Tone.Warning
+                else -> Tone.Info
+            })
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeCyclePill("WARNING", warningCount.toString(), Modifier.weight(1f))
+            HomeCyclePill("ERROR", errorCount.toString(), Modifier.weight(1f))
+            HomeCyclePill("TOTAL", totalCount.toString(), Modifier.weight(1f))
+        }
+    }
+
+    when {
+        errorCount > 0 -> HomeGradientCard(
+            modifier = Modifier.testTag("homeLogsCard"),
+            gradient = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF191B22),
+                    Color(0xFF241D27),
+                    Color(0xFF30202B)
+                )
+            ),
+            borderColor = Danger.copy(alpha = 0.36f),
+            onClick = onClick
+        ) {
+            Content()
+        }
+        warningCount > 0 -> HomeGradientCard(
+            modifier = Modifier.testTag("homeLogsCard"),
+            gradient = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF171820),
+                    Color(0xFF1E1B1E),
+                    Color(0xFF2B2418)
+                )
+            ),
+            borderColor = Warning.copy(alpha = 0.36f),
+            onClick = onClick
+        ) {
+            Content()
+        }
+        else -> NjordCard(Modifier.testTag("homeLogsCard"), onClick = onClick) {
+            Content()
         }
     }
 }

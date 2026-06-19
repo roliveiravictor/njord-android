@@ -283,6 +283,7 @@ data class HomeSnapshot(
     val openPositionCount: String,
     val strategies: List<StrategySummary>,
     val activitySummary: ActivitySummary?,
+    val logsSummary: HomeLogsSummary,
     val heartbeatHealthy: Int,
     val heartbeatTotal: Int,
     val heartbeatLateCount: Int,
@@ -297,6 +298,7 @@ data class StrategySummary(
     val assets: String? = null
 )
 data class ActivitySummary(val opened: String, val closed: String, val kept: String)
+data class HomeLogsSummary(val warningCount: Int, val errorCount: Int, val totalCount: Int, val hours: Int)
 data class PerformanceSnapshot(
     val totalEquity: String,
     val returnBadge: String,

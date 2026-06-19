@@ -39,6 +39,24 @@ endpoint has a dedicated `ApiCacheKey` enum entry and a corresponding JSON file.
 effect captures those values at initial composition and never sees later
 navigation changes.
 
+### Local notifications
+
+Njord generates operational notifications locally on the Android device; it does
+not use Firebase, FCM, or remote push tokens. `NjordApplication` schedules
+WorkManager jobs at app startup:
+
+- Incidents: every hour, fetch `/v1/live`; if unacknowledged incidents are
+  present, post a local notification.
+- Heartbeat: every hour, fetch `/v1/heartbeat`; if any service is not healthy,
+  post a local notification.
+- Activity: once daily at 21:30 local device time, fetch `/v1/activity?limit=1`;
+  if the latest cycle has opened/closed/kept positions and differs from the
+  last notified cycle, post a local notification.
+
+Android 13+ requires the user to grant `POST_NOTIFICATIONS`; the main activity
+requests it on launch. If permission is denied, background checks still run but
+the local notification is skipped by `NjordLocalNotifier`.
+
 ### Fetch pattern (canonical example from `loadPortfolioData`)
 
 ```kotlin

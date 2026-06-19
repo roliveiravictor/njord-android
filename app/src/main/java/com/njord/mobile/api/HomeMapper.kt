@@ -1,6 +1,7 @@
 package com.njord.mobile.api
 
 import com.njord.mobile.model.ActivitySummary
+import com.njord.mobile.model.HomeLogsSummary
 import com.njord.mobile.model.HomeSnapshot
 import com.njord.mobile.model.StrategySummary
 import java.text.NumberFormat
@@ -27,6 +28,12 @@ internal fun mapApiHome(response: HomeApiResponse, now: Instant = Instant.now())
                 kept = it.keptCount.toString()
             )
         },
+        logsSummary = HomeLogsSummary(
+            warningCount = response.logs.warningCount,
+            errorCount = response.logs.errorCount,
+            totalCount = response.logs.totalCount,
+            hours = response.logs.hours
+        ),
         heartbeatHealthy = response.heartbeat.healthy,
         heartbeatTotal = response.heartbeat.total,
         heartbeatLateCount = response.heartbeat.lateCount,

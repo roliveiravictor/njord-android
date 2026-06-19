@@ -382,6 +382,7 @@ private object ReducerFixtures {
         openPositionCount = "2",
         strategies = emptyList(),
         activitySummary = null,
+        logsSummary = HomeLogsSummary(warningCount = 0, errorCount = 0, totalCount = 0, hours = 24),
         heartbeatHealthy = 7,
         heartbeatTotal = 8,
         heartbeatLateCount = 1,

@@ -199,6 +199,12 @@ class NjordApiClientTest {
                 "total": 8,
                 "late_count": 1
               },
+              "logs": {
+                "warning_count": 8,
+                "error_count": 1,
+                "total_count": 9,
+                "hours": 24
+              },
               "incidents": [
                 {
                   "timestamp": "2026-06-12T14:00:00",
@@ -222,6 +228,10 @@ class NjordApiClientTest {
         assertEquals(2, response.latestCycle?.openedCount)
         assertEquals(7, response.heartbeat.healthy)
         assertEquals(8, response.heartbeat.total)
+        assertEquals(8, response.logs.warningCount)
+        assertEquals(1, response.logs.errorCount)
+        assertEquals(9, response.logs.totalCount)
+        assertEquals(24, response.logs.hours)
         assertEquals(1, response.incidents.size)
         assertEquals("Remote incident", response.incidents[0].title)
         assertEquals("order", response.incidents[0].category)
@@ -232,6 +242,29 @@ class NjordApiClientTest {
         val result = NjordApiClient.parseHomeResponse("""{"strategies":[]}""")
 
         assertTrue(result is HomeResult.Error)
+    }
+
+    @Test
+    fun parseHomeResponse_missingLogs_usesZeroSummary() {
+        val json = """
+            {
+              "strategies": [],
+              "heartbeat": {
+                "healthy": 8,
+                "total": 8,
+                "late_count": 0
+              }
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHomeResponse(json)
+
+        assertTrue(result is HomeResult.Success)
+        val response = (result as HomeResult.Success).response
+        assertEquals(0, response.logs.warningCount)
+        assertEquals(0, response.logs.errorCount)
+        assertEquals(0, response.logs.totalCount)
+        assertEquals(24, response.logs.hours)
     }
 
     @Test
@@ -457,6 +490,7 @@ class NjordApiClientTest {
                 keptCount = 15
             ),
             heartbeat = HomeApiHeartbeat(healthy = 7, total = 8, lateCount = 1),
+            logs = HomeApiLogs(warningCount = 8, errorCount = 1, totalCount = 9, hours = 24),
             incidents = listOf(
                 LiveApiIncident(
                     timestamp = "2026-06-14T20:24:02Z",
@@ -480,6 +514,10 @@ class NjordApiClientTest {
         assertEquals("\$4.2K", snapshot.marginInUse)
         assertEquals("18 Pos", snapshot.openPositionCount)
         assertEquals("2", snapshot.activitySummary?.opened)
+        assertEquals(8, snapshot.logsSummary.warningCount)
+        assertEquals(1, snapshot.logsSummary.errorCount)
+        assertEquals(9, snapshot.logsSummary.totalCount)
+        assertEquals(24, snapshot.logsSummary.hours)
         assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
         assertEquals("+\$184.00", snapshot.strategies[0].pnl)
         assertEquals("+2.6%", snapshot.strategies[0].pct)
