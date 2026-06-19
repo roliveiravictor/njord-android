@@ -1,0 +1,80 @@
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 286,301
+app/src/main/java/com/njord/mobile/NjordApplication.kt
+  s_0195c068add66f::t_e9786e9cd3e382 1-11
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 92-98,110,400,436-440
+README.md
+  s_0195c068add66f::t_363ada61e17df0 42-59
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 385
+app/src/main/java/com/njord/mobile/notifications/NjordNotificationWorker.kt
+  s_0195c068add66f::t_be007725edd837 46-47,54
+  s_0195c068add66f::t_1b8611ca43b2cf 1-45,48-53,55-79
+app/src/main/java/com/njord/mobile/notifications/NjordNotificationDecisions.kt
+  s_0195c068add66f::t_1b8611ca43b2cf 1-57
+app/src/main/AndroidManifest.xml
+  s_0195c068add66f::t_e9786e9cd3e382 3,6
+app/build.gradle.kts
+  s_0195c068add66f::t_e9786e9cd3e382 76
+app/src/main/java/com/njord/mobile/notifications/NjordLocalNotifier.kt
+  s_0195c068add66f::t_1b8611ca43b2cf 1-64
+app/src/main/java/com/njord/mobile/api/HomeMapper.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 4,31-36
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 202-207,231-234,247-269,493,517-520
+app/src/test/java/com/njord/mobile/notifications/NjordNotificationDecisionsTest.kt
+  s_0195c068add66f::t_11ac33a9461b0d 1-103
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_bc7f70a904eb2d::t_3efa92c1cc8b54 144,798-800,1665-1720
+  s_c54f7e99404a05::t_8c6fb0effed159 1620-1643,1647,1649
+  s_d00a572130a082::t_902e4582971695 1374-1376,1382,1384
+gradle/libs.versions.toml
+  s_0195c068add66f::t_e9786e9cd3e382 10,25
+app/src/main/java/com/njord/mobile/notifications/NjordNotificationScheduler.kt
+  s_0195c068add66f::t_1b8611ca43b2cf 1-67
+app/src/test/java/com/njord/mobile/notifications/NjordNotificationSchedulerTest.kt
+  s_0195c068add66f::t_11ac33a9461b0d 1-28
+app/src/main/java/com/njord/mobile/MainActivity.kt
+  s_0195c068add66f::t_e9786e9cd3e382 3-5,10-11,17,23-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "207078645fb6f8576708e63d4f6fda992d29ffef",
+  "prompts": {},
+  "sessions": {
+    "s_0195c068add66f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edf9e-d744-72e0-aee2-7acfd8c4fa7c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_bc7f70a904eb2d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edfb0-0529-7a72-9498-73a53bb55459",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_c54f7e99404a05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edfb5-5fce-7753-ba2c-65c5e3c46b8e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_d00a572130a082": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edbc9-3bfa-7453-9c7a-55a0a8364c8d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
