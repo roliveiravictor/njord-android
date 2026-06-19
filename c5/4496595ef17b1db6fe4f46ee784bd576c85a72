@@ -1,0 +1,19 @@
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+  s_ca9f3cab5f26b1::t_934ef945993c42 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "c54496595ef17b1db6fe4f46ee784bd576c85a72",
+  "prompts": {},
+  "sessions": {
+    "s_ca9f3cab5f26b1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee18f-2376-7942-aba3-dd2d09e96c3a",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
