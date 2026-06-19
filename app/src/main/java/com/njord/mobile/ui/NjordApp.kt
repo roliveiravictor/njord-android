@@ -833,7 +833,7 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
                 stats = snapshot.equityStats
             ) {
                 ChartCanvas(
-                    positive = true,
+                    positive = snapshot.thirtyDayTone != Tone.Danger,
                     showFill = true,
                     axisLabels = snapshot.equityAxisLabels,
                     points = snapshot.equityCurve
@@ -1673,11 +1673,6 @@ private fun HomeLogsCard(summary: HomeLogsSummary?, onClick: () -> Unit) {
     fun Content() {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Latest ${hours}h", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-            Badge("View logs", when {
-                errorCount > 0 -> Tone.Danger
-                warningCount > 0 -> Tone.Warning
-                else -> Tone.Info
-            })
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
