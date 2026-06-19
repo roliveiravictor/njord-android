@@ -1,0 +1,42 @@
+app/src/main/res/drawable/ic_launcher_monochrome.xml
+  h_261d8b521f67f2 1-29
+app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+  h_261d8b521f67f2 5-6
+app/src/main/res/values/ic_launcher_background.xml
+  h_261d8b521f67f2 3
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_449451788218ac::t_3fc9ba6ce61a2f 304
+app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+  h_261d8b521f67f2 5-6
+app/src/main/res/drawable/ic_launcher_foreground.xml
+  h_261d8b521f67f2 1-29
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_449451788218ac::t_3fc9ba6ce61a2f 573,588-625
+app/src/main/java/com/njord/mobile/api/PerformanceMapper.kt
+  s_449451788218ac::t_3fc9ba6ce61a2f 32
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_449451788218ac::t_3fc9ba6ce61a2f 1375
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_449451788218ac::t_3fc9ba6ce61a2f 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "f863a248fd9d2ab11f756357d7e74b9fd6fcbc91",
+  "prompts": {},
+  "humans": {
+    "h_261d8b521f67f2": {
+      "author": "Victor <roliveira.victor@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_449451788218ac": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee0b6-1d87-7cb0-a265-cb71e7458f05",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
