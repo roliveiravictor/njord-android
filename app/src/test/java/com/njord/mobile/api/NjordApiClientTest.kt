@@ -570,6 +570,7 @@ class NjordApiClientTest {
         val snapshot = mapApiPerformance(response)
 
         assertEquals("\$18.4K", snapshot.totalEquity)
+        assertEquals(Tone.Success, snapshot.totalEquityTone)
         assertEquals("+84.2%", snapshot.returnBadge)
         assertEquals("-\$428.00", snapshot.unrealizedPnl)
         assertEquals(Tone.Danger, snapshot.unrealizedTone)
@@ -582,6 +583,46 @@ class NjordApiClientTest {
         assertEquals("May 10", snapshot.equityCurve[0].pointLabel)
         assertEquals("-2.1%", snapshot.drawdownCurve[1].valueLabel)
         assertEquals("-2.1%", snapshot.drawdownStats[0].value)
+    }
+
+    @Test
+    fun mapApiPerformance_marksNegativeTotalEquityDanger() {
+        val response = PerformanceApiResponse(
+            totalEquity = -240.0,
+            allTimeReturnPct = 12.0,
+            performanceStrip = PerformanceStripApiResponse(
+                todayPnl = null,
+                todayPnlPct = null,
+                sevenDayPnl = null,
+                sevenDayPnlPct = null,
+                thirtyDayPnl = null,
+                thirtyDayPnlPct = null
+            ),
+            liveMetrics = PerformanceLiveMetricsApiResponse(
+                realizedPnl = 0.0,
+                unrealizedPnl = 0.0,
+                winRate = 0.0,
+                profitFactor = 0.0,
+                totalClosedTrades = 0
+            ),
+            equityCurve = emptyList(),
+            drawdownSeries = emptyList(),
+            maxDrawdownPct = 0.0,
+            currentDrawdownPct = 0.0,
+            recoveryPct = 0.0,
+            monthlyReturns = emptyList(),
+            monthlyStats = PerformanceMonthlyStatsApiResponse(
+                bestMonth = null,
+                worstMonth = null,
+                averageMonthlyPnl = null
+            )
+        )
+
+        val snapshot = mapApiPerformance(response)
+
+        assertEquals("-\$240.00", snapshot.totalEquity)
+        assertEquals(Tone.Danger, snapshot.totalEquityTone)
+        assertEquals(Tone.Success, snapshot.returnTone)
     }
 
     @Test

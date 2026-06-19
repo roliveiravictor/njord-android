@@ -29,6 +29,7 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
 
     return PerformanceSnapshot(
         totalEquity = formatCompactCurrency(response.totalEquity),
+        totalEquityTone = toneFor(response.totalEquity),
         returnBadge = formatSignedPercent(response.allTimeReturnPct),
         returnTone = toneFor(response.allTimeReturnPct),
         unrealizedPnl = formatSignedCurrency(response.liveMetrics.unrealizedPnl),

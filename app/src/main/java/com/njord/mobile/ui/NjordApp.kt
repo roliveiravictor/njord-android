@@ -1372,7 +1372,7 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     snapshot.totalEquity,
-                    color = Success,
+                    color = toneColor(snapshot.totalEquityTone),
                     fontSize = 38.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,

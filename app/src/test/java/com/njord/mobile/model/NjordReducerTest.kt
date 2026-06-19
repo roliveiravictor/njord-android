@@ -167,6 +167,7 @@ class NjordReducerTest {
     fun performanceLoaded_replacesSnapshotAndClearsLoading() {
         val snapshot = PerformanceSnapshot(
             totalEquity = "\$18.4k",
+            totalEquityTone = Tone.Success,
             returnBadge = "ALL +84.2%",
             returnTone = Tone.Success,
             unrealizedPnl = "-\$428",

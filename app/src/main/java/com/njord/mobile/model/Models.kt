@@ -301,6 +301,7 @@ data class ActivitySummary(val opened: String, val closed: String, val kept: Str
 data class HomeLogsSummary(val warningCount: Int, val errorCount: Int, val totalCount: Int, val hours: Int)
 data class PerformanceSnapshot(
     val totalEquity: String,
+    val totalEquityTone: Tone,
     val returnBadge: String,
     val returnTone: Tone,
     val unrealizedPnl: String,
