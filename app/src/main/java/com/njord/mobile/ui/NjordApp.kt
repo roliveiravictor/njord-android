@@ -823,7 +823,7 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             NjordCard { Text("No performance data available yet.", color = TextMuted, fontSize = 13.sp) }
         } else {
             PerformanceHero(snapshot, state.performanceStrategyFilter)
-            SectionTitle("Performance history")
+            SectionTitle("History")
             PerformanceMonthlyStats(snapshot.historyMetrics)
             PerformanceMonthlyStats(snapshot.monthlyStats)
             ReturnByMonthCard(snapshot)
@@ -1365,7 +1365,7 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
             .testTag("performanceHero")
     ) {
         Column {
-            val heroTitle = if (strategyFilter == StrategyFilter.All) "STRATEGIES PERFORMANCE" else "${strategyFilter.label.uppercase()} PERFORMANCE"
+            val heroTitle = if (strategyFilter == StrategyFilter.All) "Overall" else strategyFilter.label
             Text(heroTitle, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.height(7.dp))
             Row(verticalAlignment = Alignment.Bottom) {

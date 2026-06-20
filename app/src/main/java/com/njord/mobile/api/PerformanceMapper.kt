@@ -45,8 +45,8 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
         thirtyDayTone = toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0),
         historyMetrics = listOf(
             PerformanceMetric("WIN RATE", "${formatNumber(response.winRate)}%", Tone.Muted, "${response.totalClosedTrades} closed trades"),
-            PerformanceMetric("PROFIT FACTOR", formatNumber(response.profitFactor), Tone.Muted, "Gross profit / loss"),
-            PerformanceMetric("SHARPE RATIO", formatNumber(response.sharpeRatio), Tone.Muted, "Risk-adjusted return")
+            PerformanceMetric("PROFIT FACTOR", formatNumber(response.profitFactor), Tone.Muted, "Gross profit"),
+            PerformanceMetric("SHARPE RATIO", formatNumber(response.sharpeRatio), Tone.Muted, "Risk-adjusted")
         ),
         monthlyStats = listOf(
             PerformanceMetric("BEST MONTH", bestMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", bestMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, bestMonth?.month?.let(::formatMonth) ?: "No data"),
