@@ -1380,7 +1380,6 @@ private fun PerformanceHero(snapshot: PerformanceSnapshot, strategyFilter: Strat
                 Spacer(Modifier.width(8.dp))
                 Text("${snapshot.returnBadge} all time", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
-            Text("Total equity", color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         }
         Spacer(Modifier.height(28.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

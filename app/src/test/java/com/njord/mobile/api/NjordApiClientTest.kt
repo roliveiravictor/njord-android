@@ -325,10 +325,15 @@ class NjordApiClientTest {
                 "thirty_day_pnl":2400.0,
                 "thirty_day_pnl_pct":14.8
               },
-              "win_rate":56.0,
-              "profit_factor":1.42,
-              "sharpe_ratio":0.87,
-              "total_closed_trades":124,
+              "live_metrics":{
+                "realized_pnl":62.71,
+                "unrealized_pnl":4.48,
+                "win_rate":40.0,
+                "profit_factor":1.67,
+                "sharpe_ratio":-1.15,
+                "total_closed_trades":30,
+                "average_trade_pct":-0.2443
+              },
               "equity_curve":[
                 {"timestamp":"2026-05-10","equity":16000.0},
                 {"timestamp":"2026-06-10","equity":18420.0}
@@ -358,8 +363,10 @@ class NjordApiClientTest {
         val response = (result as PerformanceResult.Success).response
         assertEquals(18420.0, response.totalEquity, 0.0001)
         assertEquals(96.0, response.performanceStrip.todayPnl ?: 0.0, 0.0001)
-        assertEquals(124, response.totalClosedTrades)
-        assertEquals(0.87, response.sharpeRatio, 0.0001)
+        assertEquals(30, response.totalClosedTrades)
+        assertEquals(40.0, response.winRate, 0.0001)
+        assertEquals(1.67, response.profitFactor, 0.0001)
+        assertEquals(-1.15, response.sharpeRatio, 0.0001)
         assertEquals(2, response.equityCurve.size)
         assertEquals(-2.1, response.drawdownSeries[1].drawdownPct, 0.0001)
         assertEquals("2026-05", response.monthlyStats.bestMonth?.month)

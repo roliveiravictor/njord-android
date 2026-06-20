@@ -480,6 +480,7 @@ object NjordApiClient {
             val root = JSONObject(json)
             val performanceStripObject = root.optJSONObject("performance_strip")
                 ?: return PerformanceResult.Error("Missing 'performance_strip' key")
+            val metricsObject = root.optJSONObject("live_metrics") ?: root
             val monthlyStatsObject = root.optJSONObject("monthly_stats") ?: JSONObject()
             PerformanceResult.Success(
                 PerformanceApiResponse(
@@ -493,10 +494,10 @@ object NjordApiClient {
                         thirtyDayPnl = performanceStripObject.optionalDouble("thirty_day_pnl"),
                         thirtyDayPnlPct = performanceStripObject.optionalDouble("thirty_day_pnl_pct")
                     ),
-                    winRate = root.optDouble("win_rate", 0.0),
-                    profitFactor = root.optDouble("profit_factor", 0.0),
-                    sharpeRatio = root.optDouble("sharpe_ratio", 0.0),
-                    totalClosedTrades = root.optInt("total_closed_trades", 0),
+                    winRate = metricsObject.optDouble("win_rate", 0.0),
+                    profitFactor = metricsObject.optDouble("profit_factor", 0.0),
+                    sharpeRatio = metricsObject.optDouble("sharpe_ratio", 0.0),
+                    totalClosedTrades = metricsObject.optInt("total_closed_trades", 0),
                     equityCurve = parseEquityCurve(root),
                     drawdownSeries = parseDrawdownSeries(root),
                     maxDrawdownPct = root.optDouble("max_drawdown_pct", 0.0),
