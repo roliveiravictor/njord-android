@@ -120,14 +120,6 @@ data class PerformanceStripApiResponse(
     val thirtyDayPnlPct: Double?
 )
 
-data class PerformanceLiveMetricsApiResponse(
-    val realizedPnl: Double,
-    val unrealizedPnl: Double,
-    val winRate: Double,
-    val profitFactor: Double,
-    val totalClosedTrades: Int
-)
-
 data class PerformanceEquityPointApiResponse(
     val timestamp: String,
     val equity: Double
@@ -154,7 +146,10 @@ data class PerformanceApiResponse(
     val totalEquity: Double,
     val allTimeReturnPct: Double,
     val performanceStrip: PerformanceStripApiResponse,
-    val liveMetrics: PerformanceLiveMetricsApiResponse,
+    val winRate: Double,
+    val profitFactor: Double,
+    val sharpeRatio: Double,
+    val totalClosedTrades: Int,
     val equityCurve: List<PerformanceEquityPointApiResponse>,
     val drawdownSeries: List<PerformanceDrawdownPointApiResponse>,
     val maxDrawdownPct: Double,
@@ -485,8 +480,6 @@ object NjordApiClient {
             val root = JSONObject(json)
             val performanceStripObject = root.optJSONObject("performance_strip")
                 ?: return PerformanceResult.Error("Missing 'performance_strip' key")
-            val liveMetricsObject = root.optJSONObject("live_metrics")
-                ?: return PerformanceResult.Error("Missing 'live_metrics' key")
             val monthlyStatsObject = root.optJSONObject("monthly_stats") ?: JSONObject()
             PerformanceResult.Success(
                 PerformanceApiResponse(
@@ -500,13 +493,10 @@ object NjordApiClient {
                         thirtyDayPnl = performanceStripObject.optionalDouble("thirty_day_pnl"),
                         thirtyDayPnlPct = performanceStripObject.optionalDouble("thirty_day_pnl_pct")
                     ),
-                    liveMetrics = PerformanceLiveMetricsApiResponse(
-                        realizedPnl = liveMetricsObject.optDouble("realized_pnl", 0.0),
-                        unrealizedPnl = liveMetricsObject.optDouble("unrealized_pnl", 0.0),
-                        winRate = liveMetricsObject.optDouble("win_rate", 0.0),
-                        profitFactor = liveMetricsObject.optDouble("profit_factor", 0.0),
-                        totalClosedTrades = liveMetricsObject.optInt("total_closed_trades", 0)
-                    ),
+                    winRate = root.optDouble("win_rate", 0.0),
+                    profitFactor = root.optDouble("profit_factor", 0.0),
+                    sharpeRatio = root.optDouble("sharpe_ratio", 0.0),
+                    totalClosedTrades = root.optInt("total_closed_trades", 0),
                     equityCurve = parseEquityCurve(root),
                     drawdownSeries = parseDrawdownSeries(root),
                     maxDrawdownPct = root.optDouble("max_drawdown_pct", 0.0),

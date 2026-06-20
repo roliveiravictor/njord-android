@@ -823,9 +823,8 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             NjordCard { Text("No performance data available yet.", color = TextMuted, fontSize = 13.sp) }
         } else {
             PerformanceHero(snapshot, state.performanceStrategyFilter)
-            SectionTitle("Live metrics")
-            PerformanceMetricGrid(snapshot.liveMetrics)
             SectionTitle("Performance history")
+            PerformanceMonthlyStats(snapshot.historyMetrics)
             PerformanceMonthlyStats(snapshot.monthlyStats)
             ReturnByMonthCard(snapshot)
             PerformanceHistoryCard(

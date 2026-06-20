@@ -315,7 +315,7 @@ data class PerformanceSnapshot(
     val thirtyDayPnl: String,
     val thirtyDayPct: String,
     val thirtyDayTone: Tone,
-    val liveMetrics: List<PerformanceMetric>,
+    val historyMetrics: List<PerformanceMetric>,
     val monthlyStats: List<PerformanceMetric>,
     val equityStats: List<PerformanceMetric>,
     val equityCurve: List<ChartPoint>,

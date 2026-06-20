@@ -21,8 +21,7 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
     val averagePnl = response.monthlyStats.averageMonthlyPnl
         ?: response.monthlyReturns.takeIf { it.isNotEmpty() }?.map { it.pnlPct }?.average()
 
-    val intradayPnl = response.liveMetrics.realizedPnl + response.liveMetrics.unrealizedPnl
-    val todayPnlValue = response.performanceStrip.todayPnl ?: intradayPnl
+    val todayPnlValue = response.performanceStrip.todayPnl ?: 0.0
     val todayPnlKnown = response.performanceStrip.todayPnl != null
 
     val peakReturn = (response.equityCurve.maxOfOrNull { it.equity } ?: 100.0) - 100.0
@@ -32,8 +31,8 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
         totalEquityTone = toneFor(response.totalEquity),
         returnBadge = formatSignedPercent(response.allTimeReturnPct),
         returnTone = toneFor(response.allTimeReturnPct),
-        unrealizedPnl = formatSignedCurrency(response.liveMetrics.unrealizedPnl),
-        unrealizedTone = toneFor(response.liveMetrics.unrealizedPnl),
+        unrealizedPnl = "N/A",
+        unrealizedTone = Tone.Muted,
         todayPnl = formatSignedCurrency(todayPnlValue),
         todayPct = response.performanceStrip.todayPnlPct?.let(::formatSignedPercent)
             ?: if (todayPnlKnown) "No baseline" else "Intraday",
@@ -44,11 +43,10 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
         thirtyDayPnl = response.performanceStrip.thirtyDayPnl?.let(::formatSignedCurrency) ?: "N/A",
         thirtyDayPct = response.performanceStrip.thirtyDayPnlPct?.let(::formatSignedPercent) ?: "No baseline",
         thirtyDayTone = toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0),
-        liveMetrics = listOf(
-            PerformanceMetric("REALIZED P&L", formatSignedCurrency(response.liveMetrics.realizedPnl), toneFor(response.liveMetrics.realizedPnl), "Closed positions"),
-            PerformanceMetric("UNREALIZED P&L", formatSignedCurrency(response.liveMetrics.unrealizedPnl), toneFor(response.liveMetrics.unrealizedPnl), "Open positions"),
-            PerformanceMetric("WIN RATE", "${formatNumber(response.liveMetrics.winRate)}%", Tone.Muted, "${response.liveMetrics.totalClosedTrades} closed trades"),
-            PerformanceMetric("PROFIT FACTOR", formatNumber(response.liveMetrics.profitFactor), Tone.Muted, "Gross profit / loss")
+        historyMetrics = listOf(
+            PerformanceMetric("WIN RATE", "${formatNumber(response.winRate)}%", Tone.Muted, "${response.totalClosedTrades} closed trades"),
+            PerformanceMetric("PROFIT FACTOR", formatNumber(response.profitFactor), Tone.Muted, "Gross profit / loss"),
+            PerformanceMetric("SHARPE RATIO", formatNumber(response.sharpeRatio), Tone.Muted, "Risk-adjusted return")
         ),
         monthlyStats = listOf(
             PerformanceMetric("BEST MONTH", bestMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", bestMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, bestMonth?.month?.let(::formatMonth) ?: "No data"),

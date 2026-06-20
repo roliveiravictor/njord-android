@@ -325,13 +325,10 @@ class NjordApiClientTest {
                 "thirty_day_pnl":2400.0,
                 "thirty_day_pnl_pct":14.8
               },
-              "live_metrics":{
-                "realized_pnl":1900.0,
-                "unrealized_pnl":428.0,
-                "win_rate":56.0,
-                "profit_factor":1.42,
-                "total_closed_trades":124
-              },
+              "win_rate":56.0,
+              "profit_factor":1.42,
+              "sharpe_ratio":0.87,
+              "total_closed_trades":124,
               "equity_curve":[
                 {"timestamp":"2026-05-10","equity":16000.0},
                 {"timestamp":"2026-06-10","equity":18420.0}
@@ -361,17 +358,18 @@ class NjordApiClientTest {
         val response = (result as PerformanceResult.Success).response
         assertEquals(18420.0, response.totalEquity, 0.0001)
         assertEquals(96.0, response.performanceStrip.todayPnl ?: 0.0, 0.0001)
-        assertEquals(124, response.liveMetrics.totalClosedTrades)
+        assertEquals(124, response.totalClosedTrades)
+        assertEquals(0.87, response.sharpeRatio, 0.0001)
         assertEquals(2, response.equityCurve.size)
         assertEquals(-2.1, response.drawdownSeries[1].drawdownPct, 0.0001)
         assertEquals("2026-05", response.monthlyStats.bestMonth?.month)
     }
 
     @Test
-    fun parsePerformanceResponse_missingLiveMetrics_returnsError() {
+    fun parsePerformanceResponse_missingLiveMetrics_returnsSuccess() {
         val result = NjordApiClient.parsePerformanceResponse("""{"performance_strip":{}}""")
 
-        assertTrue(result is PerformanceResult.Error)
+        assertTrue(result is PerformanceResult.Success)
     }
 
     @Test
@@ -538,13 +536,10 @@ class NjordApiClientTest {
                 thirtyDayPnl = 2400.0,
                 thirtyDayPnlPct = 14.8
             ),
-            liveMetrics = PerformanceLiveMetricsApiResponse(
-                realizedPnl = 1900.0,
-                unrealizedPnl = -428.0,
-                winRate = 56.0,
-                profitFactor = 1.42,
-                totalClosedTrades = 124
-            ),
+            winRate = 56.0,
+            profitFactor = 1.42,
+            sharpeRatio = 0.87,
+            totalClosedTrades = 124,
             equityCurve = listOf(
                 PerformanceEquityPointApiResponse("2026-05-10", 16000.0),
                 PerformanceEquityPointApiResponse("2026-06-10", 18420.0)
@@ -572,11 +567,12 @@ class NjordApiClientTest {
         assertEquals("\$18.4K", snapshot.totalEquity)
         assertEquals(Tone.Success, snapshot.totalEquityTone)
         assertEquals("+84.2%", snapshot.returnBadge)
-        assertEquals("-\$428.00", snapshot.unrealizedPnl)
-        assertEquals(Tone.Danger, snapshot.unrealizedTone)
+        assertEquals("N/A", snapshot.unrealizedPnl)
+        assertEquals(Tone.Muted, snapshot.unrealizedTone)
         assertEquals("+\$96.00", snapshot.todayPnl)
-        assertEquals("-\$428.00", snapshot.liveMetrics[1].value)
-        assertEquals("56.0%", snapshot.liveMetrics[2].value)
+        assertEquals("56.0%", snapshot.historyMetrics[0].value)
+        assertEquals("1.4", snapshot.historyMetrics[1].value)
+        assertEquals("0.9", snapshot.historyMetrics[2].value)
         assertEquals("May", snapshot.monthlyReturns[0].month)
         assertEquals(2, snapshot.equityCurve.size)
         assertEquals("$16,000.00", snapshot.equityCurve[0].valueLabel)
@@ -598,13 +594,10 @@ class NjordApiClientTest {
                 thirtyDayPnl = null,
                 thirtyDayPnlPct = null
             ),
-            liveMetrics = PerformanceLiveMetricsApiResponse(
-                realizedPnl = 0.0,
-                unrealizedPnl = 0.0,
-                winRate = 0.0,
-                profitFactor = 0.0,
-                totalClosedTrades = 0
-            ),
+            winRate = 0.0,
+            profitFactor = 0.0,
+            sharpeRatio = 0.0,
+            totalClosedTrades = 0,
             equityCurve = emptyList(),
             drawdownSeries = emptyList(),
             maxDrawdownPct = 0.0,
