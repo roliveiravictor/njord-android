@@ -1,0 +1,23 @@
+app/src/androidTest/java/com/njord/mobile/NjordAppTest.kt
+  s_9af02f119c919c::t_424ce3ce617509 70
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_9af02f119c919c::t_424ce3ce617509 826,1368
+app/src/main/java/com/njord/mobile/api/PerformanceMapper.kt
+  s_9af02f119c919c::t_424ce3ce617509 48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "155185424160b7b2e78f46e51fe66837fd236c78",
+  "prompts": {},
+  "sessions": {
+    "s_9af02f119c919c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee692-9691-7a71-848f-4e2fb7263365",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
