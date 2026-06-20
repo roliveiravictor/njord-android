@@ -1,0 +1,21 @@
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_64d0a228868b0d::t_c1e530671bea1c 483,497-500
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_64d0a228868b0d::t_c6c24ef651ffa0 328-336,366-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "98f56735e66a618dd2a3a4d5a3fb8bfdac69f3f5",
+  "prompts": {},
+  "sessions": {
+    "s_64d0a228868b0d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee676-bbeb-76e3-847e-d6fbea074ca7",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
