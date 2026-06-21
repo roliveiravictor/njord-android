@@ -1,0 +1,30 @@
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_9af02f119c919c::t_6cc64ed72e12fe 185
+app/src/main/java/com/njord/mobile/api/NjordApiClient.kt
+  s_9af02f119c919c::t_6cc64ed72e12fe 153-155,504-506
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_9af02f119c919c::t_6cc64ed72e12fe 828
+app/src/main/java/com/njord/mobile/api/PerformanceMapper.kt
+  s_9af02f119c919c::t_6ac2cc4e18b2e8 65
+  s_9af02f119c919c::t_6cc64ed72e12fe 29-45,68-71
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_9af02f119c919c::t_6cc64ed72e12fe 550-552,586-593,619-621
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_9af02f119c919c::t_6cc64ed72e12fe 319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "5934ab97e0491e04285d588bb75272d0d8bd9bc8",
+  "prompts": {},
+  "sessions": {
+    "s_9af02f119c919c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ee692-9691-7a71-848f-4e2fb7263365",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
