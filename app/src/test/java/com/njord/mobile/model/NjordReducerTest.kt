@@ -182,6 +182,7 @@ class NjordReducerTest {
             thirtyDayPct = "+14.8%",
             thirtyDayTone = Tone.Success,
             historyMetrics = emptyList(),
+            streakMetrics = emptyList(),
             monthlyStats = emptyList(),
             equityStats = emptyList(),
             equityCurve = emptyList(),

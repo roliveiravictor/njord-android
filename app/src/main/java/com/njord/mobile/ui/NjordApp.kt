@@ -825,6 +825,7 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             PerformanceHero(snapshot, state.performanceStrategyFilter)
             SectionTitle("History")
             PerformanceMonthlyStats(snapshot.historyMetrics)
+            PerformanceMonthlyStats(snapshot.streakMetrics)
             PerformanceMonthlyStats(snapshot.monthlyStats)
             ReturnByMonthCard(snapshot)
             PerformanceHistoryCard(

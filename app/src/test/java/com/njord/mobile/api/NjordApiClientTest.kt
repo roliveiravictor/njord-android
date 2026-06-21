@@ -547,6 +547,9 @@ class NjordApiClientTest {
             profitFactor = 1.42,
             sharpeRatio = 0.87,
             totalClosedTrades = 124,
+            maxWinStreak = 5,
+            maxLoseStreak = 3,
+            currentStreak = 2,
             equityCurve = listOf(
                 PerformanceEquityPointApiResponse("2026-05-10", 16000.0),
                 PerformanceEquityPointApiResponse("2026-06-10", 18420.0)
@@ -580,6 +583,14 @@ class NjordApiClientTest {
         assertEquals("56.0%", snapshot.historyMetrics[0].value)
         assertEquals("1.4", snapshot.historyMetrics[1].value)
         assertEquals("0.9", snapshot.historyMetrics[2].value)
+        assertEquals("CURRENT", snapshot.streakMetrics[0].label)
+        assertEquals("+2", snapshot.streakMetrics[0].value)
+        assertEquals(Tone.Success, snapshot.streakMetrics[0].tone)
+        assertEquals("Win streak", snapshot.streakMetrics[0].subtext)
+        assertEquals("WIN STREAK", snapshot.streakMetrics[1].label)
+        assertEquals("5", snapshot.streakMetrics[1].value)
+        assertEquals("LOSE STREAK", snapshot.streakMetrics[2].label)
+        assertEquals("3", snapshot.streakMetrics[2].value)
         assertEquals("May", snapshot.monthlyReturns[0].month)
         assertEquals(2, snapshot.equityCurve.size)
         assertEquals("$16,000.00", snapshot.equityCurve[0].valueLabel)
@@ -605,6 +616,9 @@ class NjordApiClientTest {
             profitFactor = 0.0,
             sharpeRatio = 0.0,
             totalClosedTrades = 0,
+            maxWinStreak = 0,
+            maxLoseStreak = 0,
+            currentStreak = 0,
             equityCurve = emptyList(),
             drawdownSeries = emptyList(),
             maxDrawdownPct = 0.0,

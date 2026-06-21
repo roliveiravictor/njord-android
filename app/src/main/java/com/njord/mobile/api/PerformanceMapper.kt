@@ -26,6 +26,23 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
 
     val peakReturn = (response.equityCurve.maxOfOrNull { it.equity } ?: 100.0) - 100.0
 
+    val currentStreakValue = response.currentStreak
+    val currentStreakFormatted = when {
+        currentStreakValue > 0 -> "+$currentStreakValue"
+        currentStreakValue < 0 -> "${currentStreakValue}"
+        else -> "0"
+    }
+    val currentStreakTone = when {
+        currentStreakValue > 0 -> Tone.Success
+        currentStreakValue < 0 -> Tone.Danger
+        else -> Tone.Muted
+    }
+    val currentStreakSubtext = when {
+        currentStreakValue > 0 -> "Win streak"
+        currentStreakValue < 0 -> "Lose streak"
+        else -> "Flat"
+    }
+
     return PerformanceSnapshot(
         totalEquity = formatCompactCurrency(response.totalEquity),
         totalEquityTone = toneFor(response.totalEquity),
@@ -45,8 +62,13 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
         thirtyDayTone = toneFor(response.performanceStrip.thirtyDayPnl ?: 0.0),
         historyMetrics = listOf(
             PerformanceMetric("WIN RATE", "${formatNumber(response.winRate)}%", Tone.Muted, "${response.totalClosedTrades} closed trades"),
-            PerformanceMetric("PROFIT FACTOR", formatNumber(response.profitFactor), Tone.Muted, "Gross profit"),
+            PerformanceMetric("PROFIT FACTOR", formatNumber(response.profitFactor), Tone.Muted, "Gross"),
             PerformanceMetric("SHARPE RATIO", formatNumber(response.sharpeRatio), Tone.Muted, "Risk-adjusted")
+        ),
+        streakMetrics = listOf(
+            PerformanceMetric("CURRENT", currentStreakFormatted, currentStreakTone, currentStreakSubtext),
+            PerformanceMetric("WIN STREAK", "${response.maxWinStreak}", Tone.Muted, "Max consecutive"),
+            PerformanceMetric("LOSE STREAK", "${response.maxLoseStreak}", Tone.Muted, "Max consecutive")
         ),
         monthlyStats = listOf(
             PerformanceMetric("BEST MONTH", bestMonth?.let { formatSignedPercent(it.pnlPct) } ?: "N/A", bestMonth?.let { toneFor(it.pnlPct) } ?: Tone.Muted, bestMonth?.month?.let(::formatMonth) ?: "No data"),
