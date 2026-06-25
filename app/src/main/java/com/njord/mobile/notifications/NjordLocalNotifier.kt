@@ -12,24 +12,27 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.njord.mobile.MainActivity
 import com.njord.mobile.R
+import com.njord.mobile.model.Destination
 
 object NjordLocalNotifier {
+    const val ExtraDestination = "extra_destination"
     private const val ChannelId = "njord_operations"
 
-    fun notify(context: Context, notificationId: Int, content: LocalNotificationContent) {
+    fun notify(context: Context, notificationId: Int, content: LocalNotificationContent, destination: Destination) {
         if (!canPostNotifications(context)) return
         val manager = context.getSystemService(NotificationManager::class.java)
         ensureChannel(manager)
-        manager.notify(notificationId, buildNotification(context, content))
+        manager.notify(notificationId, buildNotification(context, notificationId, content, destination))
     }
 
-    private fun buildNotification(context: Context, content: LocalNotificationContent): Notification {
+    private fun buildNotification(context: Context, requestCode: Int, content: LocalNotificationContent, destination: Destination): Notification {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(ExtraDestination, destination.name)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

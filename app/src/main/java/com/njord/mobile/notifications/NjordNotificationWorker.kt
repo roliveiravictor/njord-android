@@ -9,6 +9,7 @@ import com.njord.mobile.api.HeartbeatResult
 import com.njord.mobile.api.IncidentAcknowledgements
 import com.njord.mobile.api.LiveResult
 import com.njord.mobile.api.NjordApiClient
+import com.njord.mobile.model.Destination
 
 class NjordNotificationWorker(
     appContext: Context,
@@ -35,7 +36,7 @@ class NjordNotificationWorker(
                     "${it.timestamp}-${it.category}" in acknowledgedIds
                 }
                 NjordNotificationDecisions.incidentNotification(incidents)?.let { content ->
-                    NjordLocalNotifier.notify(applicationContext, 3001, content)
+                    NjordLocalNotifier.notify(applicationContext, 3001, content, Destination.Live)
                 }
                 Result.success()
             }
@@ -48,7 +49,7 @@ class NjordNotificationWorker(
             is ActivityResult.Success -> {
                 val previous = notificationPrefs().getString(ActivitySignatureKey, null)
                 NjordNotificationDecisions.activityNotification(result.response, previous)?.let { (content, signature) ->
-                    NjordLocalNotifier.notify(applicationContext, 3002, content)
+                    NjordLocalNotifier.notify(applicationContext, 3002, content, Destination.Activity)
                     notificationPrefs().edit().putString(ActivitySignatureKey, signature).apply()
                 }
                 NjordNotificationScheduler.scheduleNextDailyActivity(applicationContext)
@@ -62,7 +63,7 @@ class NjordNotificationWorker(
         when (val result = NjordApiClient.fetchHeartbeat(BuildConfig.NJORD_API_BASE_URL, BuildConfig.NJORD_API_KEY)) {
             is HeartbeatResult.Success -> {
                 NjordNotificationDecisions.heartbeatNotification(result.services)?.let { content ->
-                    NjordLocalNotifier.notify(applicationContext, 3003, content)
+                    NjordLocalNotifier.notify(applicationContext, 3003, content, Destination.Heartbeat)
                 }
                 Result.success()
             }

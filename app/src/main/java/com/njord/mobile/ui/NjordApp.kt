@@ -245,9 +245,15 @@ private val CoinLogoSourcesBySymbol = mapOf(
 )
 
 @Composable
-fun NjordApp() {
-    var state by remember { mutableStateOf(NjordUiState()) }
+fun NjordApp(notificationDestination: Destination? = null) {
+    var state by remember { mutableStateOf(NjordUiState(destination = notificationDestination ?: Destination.Home)) }
     val context = LocalContext.current.applicationContext
+
+    LaunchedEffect(notificationDestination) {
+        if (notificationDestination != null) {
+            state = reduce(state, NjordAction.Navigate(notificationDestination))
+        }
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
