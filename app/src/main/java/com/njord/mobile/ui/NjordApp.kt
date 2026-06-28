@@ -839,8 +839,10 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             NjordCard { Text("No performance data available yet.", color = TextMuted, fontSize = 13.sp) }
         } else {
             PerformanceHero(snapshot, state.performanceStrategyFilter)
-            PerformanceRecentPositions(snapshot.latestClosedPositions) {
-                onAction(NjordAction.SelectPerformancePosition(it))
+            if (state.performanceStrategyFilter != StrategyFilter.All) {
+                PerformanceRecentPositions(snapshot.latestClosedPositions) {
+                    onAction(NjordAction.SelectPerformancePosition(it))
+                }
             }
             SectionTitle("History")
             PerformanceMonthlyStats(snapshot.historyMetrics)
@@ -1857,10 +1859,39 @@ private fun PerformanceRecentPositions(
     onPositionClick: (PerformancePosition) -> Unit
 ) {
     if (positions.isEmpty()) return
+    val listState = rememberLazyListState()
+    val firstVisible = listState.firstVisibleItemIndex
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("Latest closed")
-        positions.take(3).forEach { position ->
-            PerformancePositionCard(position) { onPositionClick(position) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            LazyRow(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().testTag("performanceRecentPositionsCarousel"),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(positions) { position ->
+                    Box(Modifier.width(maxWidth)) {
+                        PerformancePositionCard(position) { onPositionClick(position) }
+                    }
+                }
+            }
+        }
+        if (positions.size > 1) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                positions.forEachIndexed { index, _ ->
+                    Box(
+                        Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(if (index == firstVisible) 7.dp else 6.dp)
+                            .clip(CircleShape)
+                            .background(if (index == firstVisible) Primary else Outline)
+                    )
+                }
+            }
         }
     }
 }
