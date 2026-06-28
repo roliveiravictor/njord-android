@@ -401,6 +401,16 @@ fun NjordDashboardScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
                 PositionSheet(position, onClose = { onAction(NjordAction.ClosePosition) })
             }
         }
+
+        state.selectedPerformancePosition?.let { position ->
+            ModalBottomSheet(
+                onDismissRequest = { onAction(NjordAction.ClosePerformancePosition) },
+                containerColor = Surface1,
+                contentColor = TextPrimary
+            ) {
+                PerformancePositionSheet(position, onClose = { onAction(NjordAction.ClosePerformancePosition) })
+            }
+        }
     }
 }
 
@@ -829,11 +839,14 @@ private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Un
             NjordCard { Text("No performance data available yet.", color = TextMuted, fontSize = 13.sp) }
         } else {
             PerformanceHero(snapshot, state.performanceStrategyFilter)
+            PerformanceRecentPositions(snapshot.latestClosedPositions) {
+                onAction(NjordAction.SelectPerformancePosition(it))
+            }
             SectionTitle("History")
             PerformanceMonthlyStats(snapshot.historyMetrics)
             PerformanceMonthlyStats(snapshot.streakMetrics)
-            PerformanceMonthlyStats(snapshot.monthlyStats)
             ReturnByMonthCard(snapshot)
+            PerformanceMonthlyStats(snapshot.monthlyStats)
             PerformanceHistoryCard(
                 title = "P&L over time",
                 stats = snapshot.equityStats
@@ -1839,28 +1852,45 @@ private fun SmallLiveDot() {
 }
 
 @Composable
-private fun PerformancePositionCard(position: PerformancePosition) {
-    NjordCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+private fun PerformanceRecentPositions(
+    positions: List<PerformancePosition>,
+    onPositionClick: (PerformancePosition) -> Unit
+) {
+    if (positions.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle("Latest closed")
+        positions.take(3).forEach { position ->
+            PerformancePositionCard(position) { onPositionClick(position) }
+        }
+    }
+}
+
+@Composable
+private fun PerformancePositionCard(position: PerformancePosition, onClick: () -> Unit) {
+    LiveCard(
+        modifier = Modifier.testTag("performancePosition-${position.symbol}"),
+        onClick = onClick
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
             CoinIcon(position.symbol, position.tone)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(position.symbol, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(position.symbol, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                     Spacer(Modifier.width(8.dp))
                     Badge(position.side, if (position.side == "Short") Tone.Danger else Tone.Success)
                 }
-                Text(position.subtitle, color = TextMuted, fontSize = 12.sp)
+                Text(position.subtitle, color = TextMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(position.pnl, color = toneColor(position.tone), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Text(position.pct, color = toneColor(position.tone), fontSize = 12.sp)
+                Text(position.pnl, color = toneColor(position.tone), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                Text(position.pct, color = toneColor(position.tone), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PriceChip("Entry", position.entry, Modifier.weight(1f))
-            PriceChip("Current", position.current, Modifier.weight(1f), position.tone)
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LiveFooterValue("ENTRY", position.entry, Modifier.weight(1f))
+            LiveFooterValue("EXIT", position.exit, Modifier.weight(1f), position.tone)
         }
     }
 }
@@ -2912,6 +2942,31 @@ private fun PositionSheet(position: LivePosition, onClose: () -> Unit) {
         SummaryLine("Capital", position.capital, Tone.Muted)
         SummaryLine("Entry", position.entry, Tone.Muted)
         SummaryLine("Current", position.current, if (position.trendUp) Tone.Success else Tone.Danger)
+        Spacer(Modifier.height(18.dp))
+    }
+}
+
+@Composable
+private fun PerformancePositionSheet(position: PerformancePosition, onClose: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(20.dp).testTag("performancePositionSheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CoinIcon(position.symbol, position.tone)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(position.symbol, color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Text("${position.strategyName} · ${position.side} · closed ${position.closed}", color = TextMuted)
+            }
+            IconButton(onClick = onClose) {
+                Icon(Icons.Outlined.Close, null, tint = TextMuted)
+            }
+        }
+        SummaryLine("Realized P&L", "${position.pnl} ${position.pct}", position.tone)
+        SummaryLine("Size", position.size, Tone.Muted)
+        SummaryLine("Capital", position.capital, Tone.Muted)
+        SummaryLine("Entry", position.entry, Tone.Muted)
+        SummaryLine("Exit", position.exit, position.tone)
+        SummaryLine("Opened", position.opened, Tone.Muted)
+        SummaryLine("Reason", position.reason, Tone.Muted)
         Spacer(Modifier.height(18.dp))
     }
 }

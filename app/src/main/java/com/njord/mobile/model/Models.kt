@@ -84,7 +84,8 @@ data class NjordUiState(
     val liveLoading: Boolean = false,
     val liveError: Boolean = false,
     val selectedIncident: Incident? = null,
-    val selectedPosition: LivePosition? = null
+    val selectedPosition: LivePosition? = null,
+    val selectedPerformancePosition: PerformancePosition? = null
 )
 
 sealed interface NjordAction {
@@ -103,6 +104,8 @@ sealed interface NjordAction {
     data class DismissIncident(val incidentId: String) : NjordAction
     data class SelectPosition(val position: LivePosition) : NjordAction
     data object ClosePosition : NjordAction
+    data class SelectPerformancePosition(val position: PerformancePosition) : NjordAction
+    data object ClosePerformancePosition : NjordAction
     data object ActivityLoading : NjordAction
     data class ActivityLoaded(val summary: ActivitySummary, val cycles: List<StrategyCycle>) : NjordAction
     data object ActivityError : NjordAction
@@ -152,7 +155,8 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         is NjordAction.Navigate -> state.copy(
             destination = action.destination,
             selectedIncident = null,
-            selectedPosition = null
+            selectedPosition = null,
+            selectedPerformancePosition = null
         )
 
         is NjordAction.SetLiveStrategyFilter -> state.copy(liveStrategyFilter = action.filter)
@@ -182,6 +186,8 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
 
         is NjordAction.SelectPosition -> state.copy(selectedPosition = action.position)
         NjordAction.ClosePosition -> state.copy(selectedPosition = null)
+        is NjordAction.SelectPerformancePosition -> state.copy(selectedPerformancePosition = action.position)
+        NjordAction.ClosePerformancePosition -> state.copy(selectedPerformancePosition = null)
         NjordAction.ActivityLoading -> state.copy(activityLoading = true, activityError = false)
         is NjordAction.ActivityLoaded -> state.copy(
             activitySummary = action.summary,
@@ -324,7 +330,8 @@ data class PerformanceSnapshot(
     val drawdownStats: List<PerformanceMetric>,
     val drawdownCurve: List<ChartPoint>,
     val drawdownAxisLabels: List<String>,
-    val monthlyReturns: List<PerformanceMonthReturn>
+    val monthlyReturns: List<PerformanceMonthReturn>,
+    val latestClosedPositions: List<PerformancePosition>
 )
 data class PerformanceMetric(
     val label: String,
@@ -382,13 +389,17 @@ data class PerformancePosition(
     val symbol: String,
     val side: String,
     val strategy: StrategyFilter,
+    val strategyName: String,
     val subtitle: String,
     val pnl: String,
     val pct: String,
     val entry: String,
-    val current: String,
+    val exit: String,
     val capital: String,
     val size: String,
+    val opened: String,
+    val closed: String,
+    val reason: String,
     val tone: Tone
 )
 

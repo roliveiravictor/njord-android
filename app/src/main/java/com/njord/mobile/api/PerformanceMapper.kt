@@ -3,7 +3,9 @@ package com.njord.mobile.api
 import com.njord.mobile.model.ChartPoint
 import com.njord.mobile.model.PerformanceMetric
 import com.njord.mobile.model.PerformanceMonthReturn
+import com.njord.mobile.model.PerformancePosition
 import com.njord.mobile.model.PerformanceSnapshot
+import com.njord.mobile.model.StrategyFilter
 import com.njord.mobile.model.Tone
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -28,16 +30,19 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
 
     val currentStreakValue = response.currentStreak
     val currentStreakFormatted = when {
+        currentStreakValue == null -> "N/A"
         currentStreakValue > 0 -> "+$currentStreakValue"
         currentStreakValue < 0 -> "${currentStreakValue}"
         else -> "0"
     }
     val currentStreakTone = when {
+        currentStreakValue == null -> Tone.Muted
         currentStreakValue > 0 -> Tone.Success
         currentStreakValue < 0 -> Tone.Danger
         else -> Tone.Muted
     }
     val currentStreakSubtext = when {
+        currentStreakValue == null -> "Aggregate"
         currentStreakValue > 0 -> "Win streak"
         currentStreakValue < 0 -> "Lose streak"
         else -> "Flat"
@@ -98,7 +103,32 @@ internal fun mapApiPerformance(response: PerformanceApiResponse): PerformanceSna
             invert = false
         ),
         drawdownAxisLabels = axisLabels(response.drawdownSeries.map { it.timestamp }, fallbackStart = "0%", fallbackEnd = "Recovery"),
-        monthlyReturns = monthlyReturns
+        monthlyReturns = monthlyReturns,
+        latestClosedPositions = response.latestClosedPositions.map(::mapClosedPosition)
+    )
+}
+
+private fun mapClosedPosition(position: PerformanceClosedPositionApiResponse): PerformancePosition {
+    val symbol = formatSymbol(position.symbol)
+    val strategy = position.strategy.toStrategyFilter()
+    val exitLabel = position.exitDate?.let(::formatShortDate) ?: "Closed"
+    val reason = position.closureReason?.takeIf { it.isNotBlank() }?.toDisplayLabel() ?: "Closed"
+    return PerformancePosition(
+        symbol = symbol,
+        side = formatSide(position.side),
+        strategy = strategy,
+        strategyName = position.strategyName.ifBlank { position.strategy.toStrategyName() },
+        subtitle = "$exitLabel · $reason",
+        pnl = formatSignedCurrency(position.pnl),
+        pct = formatSignedPercent(position.pnlPct),
+        entry = position.entryPrice?.let(::formatPrice) ?: "N/A",
+        exit = position.exitPrice?.let(::formatPrice) ?: "N/A",
+        capital = formatCompactCurrency(position.capitalAllocated),
+        size = position.quantity?.let { "${formatQuantity(it)} $symbol" } ?: "N/A",
+        opened = position.entryDate?.let(::formatShortDate) ?: "N/A",
+        closed = position.exitDate?.let(::formatShortDate) ?: "N/A",
+        reason = reason,
+        tone = toneFor(position.pnl)
     )
 }
 
@@ -156,6 +186,12 @@ private fun formatAxisDate(value: String): String =
         "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
     }.getOrDefault(value.take(6))
 
+private fun formatShortDate(value: String): String =
+    runCatching {
+        val date = LocalDate.parse(value.substringBefore("T"))
+        "${date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.dayOfMonth}"
+    }.getOrDefault(value.take(10))
+
 private fun formatMonth(value: String): String =
     runCatching { LocalDate.parse("$value-01").format(MONTH_OUTPUT) }
         .getOrDefault(value.take(3))
@@ -178,6 +214,49 @@ private fun formatCompactCurrency(value: Double): String {
     }
 }
 
+private fun formatPrice(value: Double): String =
+    when {
+        abs(value) >= 100.0 -> String.format(Locale.US, "$%,.2f", value)
+        abs(value) >= 1.0 -> String.format(Locale.US, "$%,.4f", value).trimTrailingZeros()
+        else -> String.format(Locale.US, "$%,.6f", value).trimTrailingZeros()
+    }
+
+private fun formatQuantity(value: Double): String =
+    when {
+        abs(value) >= 1_000.0 -> String.format(Locale.US, "%,.0f", value)
+        abs(value) >= 10.0 -> String.format(Locale.US, "%,.2f", value).trimTrailingZeros()
+        else -> String.format(Locale.US, "%,.4f", value).trimTrailingZeros()
+    }
+
+private fun formatSymbol(symbol: String): String =
+    symbol.substringBefore("/")
+        .substringBefore(":")
+        .uppercase()
+
+private fun formatSide(side: String): String =
+    side.lowercase().replaceFirstChar { it.uppercase() }
+
+private fun String.toStrategyFilter(): StrategyFilter =
+    when (lowercase()) {
+        "big_bang", "big-bang", "big bang" -> StrategyFilter.BigBang
+        "wcr" -> StrategyFilter.Wcr
+        "hunch" -> StrategyFilter.Hunch
+        else -> StrategyFilter.All
+    }
+
+private fun String.toStrategyName(): String =
+    when (toStrategyFilter()) {
+        StrategyFilter.BigBang -> "Big Bang"
+        StrategyFilter.Wcr -> "WCR"
+        StrategyFilter.Hunch -> "Hunch"
+        StrategyFilter.All -> if (isBlank()) "Unknown" else toDisplayLabel()
+    }
+
+private fun String.toDisplayLabel(): String =
+    split("_", "-", " ")
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { part -> part.lowercase().replaceFirstChar { it.uppercase() } }
+
 private fun formatSignedPercent(value: Double): String =
     "${String.format(Locale.US, "%+.1f", value)}%"
 
@@ -196,3 +275,6 @@ private fun toneForDrawdown(value: Double): Tone =
         abs(value) > 0.0 -> Tone.Warning
         else -> Tone.Muted
     }
+
+private fun String.trimTrailingZeros(): String =
+    replace(Regex("0+$"), "").replace(Regex("\\.$"), "")

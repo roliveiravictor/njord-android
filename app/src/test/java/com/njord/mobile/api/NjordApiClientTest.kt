@@ -353,7 +353,24 @@ class NjordApiClientTest {
                 "best_month":{"month":"2026-05","pnl":300.0,"pnl_pct":3.8},
                 "worst_month":{"month":"2026-06","pnl":120.0,"pnl_pct":1.4},
                 "average_monthly_pnl":2.6
-              }
+              },
+              "latest_closed_positions":[
+                {
+                  "symbol":"SOL/USDT",
+                  "side":"short",
+                  "strategy":"wcr",
+                  "strategy_name":"WCR",
+                  "entry_price":150.25,
+                  "exit_price":142.5,
+                  "quantity":3.2,
+                  "capital_allocated":480.8,
+                  "pnl":24.8,
+                  "pnl_pct":5.16,
+                  "entry_date":"2026-06-10T20:00:00Z",
+                  "exit_date":"2026-06-14T20:00:00Z",
+                  "closure_reason":"take_profit"
+                }
+              ]
             }
         """.trimIndent()
 
@@ -370,6 +387,8 @@ class NjordApiClientTest {
         assertEquals(2, response.equityCurve.size)
         assertEquals(-2.1, response.drawdownSeries[1].drawdownPct, 0.0001)
         assertEquals("2026-05", response.monthlyStats.bestMonth?.month)
+        assertEquals("SOL/USDT", response.latestClosedPositions.single().symbol)
+        assertEquals(24.8, response.latestClosedPositions.single().pnl, 0.0001)
     }
 
     @Test
@@ -569,6 +588,23 @@ class NjordApiClientTest {
                 bestMonth = null,
                 worstMonth = null,
                 averageMonthlyPnl = null
+            ),
+            latestClosedPositions = listOf(
+                PerformanceClosedPositionApiResponse(
+                    symbol = "ATOM/USDT",
+                    side = "long",
+                    strategy = "big_bang",
+                    strategyName = "Big Bang",
+                    entryPrice = 2.0137,
+                    exitPrice = 2.1939,
+                    quantity = 170.61,
+                    capitalAllocated = 343.5574,
+                    pnl = 30.74,
+                    pnlPct = 8.95,
+                    entryDate = "2026-06-11T20:00:00Z",
+                    exitDate = "2026-06-14T20:00:00Z",
+                    closureReason = "take_profit"
+                )
             )
         )
 
@@ -597,6 +633,10 @@ class NjordApiClientTest {
         assertEquals("May 10", snapshot.equityCurve[0].pointLabel)
         assertEquals("-2.1%", snapshot.drawdownCurve[1].valueLabel)
         assertEquals("-2.1%", snapshot.drawdownStats[0].value)
+        assertEquals("ATOM", snapshot.latestClosedPositions.single().symbol)
+        assertEquals("+\$30.74", snapshot.latestClosedPositions.single().pnl)
+        assertEquals("+9.0%", snapshot.latestClosedPositions.single().pct)
+        assertEquals("Jun 14 · Take Profit", snapshot.latestClosedPositions.single().subtitle)
     }
 
     @Test
@@ -629,7 +669,8 @@ class NjordApiClientTest {
                 bestMonth = null,
                 worstMonth = null,
                 averageMonthlyPnl = null
-            )
+            ),
+            latestClosedPositions = emptyList()
         )
 
         val snapshot = mapApiPerformance(response)
@@ -637,6 +678,49 @@ class NjordApiClientTest {
         assertEquals("-\$240.00", snapshot.totalEquity)
         assertEquals(Tone.Danger, snapshot.totalEquityTone)
         assertEquals(Tone.Success, snapshot.returnTone)
+    }
+
+    @Test
+    fun mapApiPerformance_formatsNullCurrentStreakAsNotAvailable() {
+        val response = PerformanceApiResponse(
+            totalEquity = 100.0,
+            allTimeReturnPct = 1.0,
+            performanceStrip = PerformanceStripApiResponse(
+                todayPnl = null,
+                todayPnlPct = null,
+                sevenDayPnl = null,
+                sevenDayPnlPct = null,
+                thirtyDayPnl = null,
+                thirtyDayPnlPct = null
+            ),
+            winRate = 0.0,
+            profitFactor = 0.0,
+            sharpeRatio = 0.0,
+            totalClosedTrades = 0,
+            maxWinStreak = 5,
+            maxLoseStreak = 3,
+            currentStreak = null,
+            equityCurve = emptyList(),
+            drawdownSeries = emptyList(),
+            maxDrawdownPct = 0.0,
+            currentDrawdownPct = 0.0,
+            recoveryPct = 0.0,
+            monthlyReturns = emptyList(),
+            monthlyStats = PerformanceMonthlyStatsApiResponse(
+                bestMonth = null,
+                worstMonth = null,
+                averageMonthlyPnl = null
+            ),
+            latestClosedPositions = emptyList()
+        )
+
+        val snapshot = mapApiPerformance(response)
+
+        assertEquals("N/A", snapshot.streakMetrics[0].value)
+        assertEquals(Tone.Muted, snapshot.streakMetrics[0].tone)
+        assertEquals("Aggregate", snapshot.streakMetrics[0].subtext)
+        assertEquals("5", snapshot.streakMetrics[1].value)
+        assertEquals("3", snapshot.streakMetrics[2].value)
     }
 
     @Test

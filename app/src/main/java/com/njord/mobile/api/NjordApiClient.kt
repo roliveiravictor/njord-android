@@ -142,6 +142,22 @@ data class PerformanceMonthlyStatsApiResponse(
     val averageMonthlyPnl: Double?
 )
 
+data class PerformanceClosedPositionApiResponse(
+    val symbol: String,
+    val side: String,
+    val strategy: String,
+    val strategyName: String,
+    val entryPrice: Double?,
+    val exitPrice: Double?,
+    val quantity: Double?,
+    val capitalAllocated: Double,
+    val pnl: Double,
+    val pnlPct: Double,
+    val entryDate: String?,
+    val exitDate: String?,
+    val closureReason: String?
+)
+
 data class PerformanceApiResponse(
     val totalEquity: Double,
     val allTimeReturnPct: Double,
@@ -152,14 +168,15 @@ data class PerformanceApiResponse(
     val totalClosedTrades: Int,
     val maxWinStreak: Int,
     val maxLoseStreak: Int,
-    val currentStreak: Int,
+    val currentStreak: Int?,
     val equityCurve: List<PerformanceEquityPointApiResponse>,
     val drawdownSeries: List<PerformanceDrawdownPointApiResponse>,
     val maxDrawdownPct: Double,
     val currentDrawdownPct: Double,
     val recoveryPct: Double,
     val monthlyReturns: List<PerformanceMonthlyReturnApiResponse>,
-    val monthlyStats: PerformanceMonthlyStatsApiResponse
+    val monthlyStats: PerformanceMonthlyStatsApiResponse,
+    val latestClosedPositions: List<PerformanceClosedPositionApiResponse>
 )
 
 data class LiveApiPosition(
@@ -503,7 +520,7 @@ object NjordApiClient {
                     totalClosedTrades = metricsObject.optInt("total_closed_trades", 0),
                     maxWinStreak = metricsObject.optInt("max_win_streak", 0),
                     maxLoseStreak = metricsObject.optInt("max_lose_streak", 0),
-                    currentStreak = metricsObject.optInt("current_streak", 0),
+                    currentStreak = metricsObject.optionalInt("current_streak"),
                     equityCurve = parseEquityCurve(root),
                     drawdownSeries = parseDrawdownSeries(root),
                     maxDrawdownPct = root.optDouble("max_drawdown_pct", 0.0),
@@ -514,7 +531,8 @@ object NjordApiClient {
                         bestMonth = parseMonthlyReturn(monthlyStatsObject.optJSONObject("best_month")),
                         worstMonth = parseMonthlyReturn(monthlyStatsObject.optJSONObject("worst_month")),
                         averageMonthlyPnl = monthlyStatsObject.optionalDouble("average_monthly_pnl")
-                    )
+                    ),
+                    latestClosedPositions = parsePerformanceClosedPositions(root.optJSONArray("latest_closed_positions"))
                 )
             )
         } catch (e: Exception) {
@@ -656,6 +674,29 @@ object NjordApiClient {
             pnl = obj.optDouble("pnl", 0.0),
             pnlPct = obj.optDouble("pnl_pct", 0.0)
         )
+    }
+
+    private fun parsePerformanceClosedPositions(array: org.json.JSONArray?): List<PerformanceClosedPositionApiResponse> {
+        if (array == null) return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            array.optJSONObject(i)?.let { obj ->
+                PerformanceClosedPositionApiResponse(
+                    symbol = obj.optString("symbol", ""),
+                    side = obj.optString("side", ""),
+                    strategy = obj.optString("strategy", ""),
+                    strategyName = obj.optString("strategy_name", ""),
+                    entryPrice = obj.optionalDouble("entry_price"),
+                    exitPrice = obj.optionalDouble("exit_price"),
+                    quantity = obj.optionalDouble("quantity"),
+                    capitalAllocated = obj.optDouble("capital_allocated", 0.0),
+                    pnl = obj.optDouble("pnl", 0.0),
+                    pnlPct = obj.optDouble("pnl_pct", 0.0),
+                    entryDate = obj.optionalString("entry_date"),
+                    exitDate = obj.optionalString("exit_date"),
+                    closureReason = obj.optionalString("closure_reason")
+                )
+            }
+        }
     }
 
     private fun parsePositionArray(obj: JSONObject, key: String): List<ActivityApiPosition> {

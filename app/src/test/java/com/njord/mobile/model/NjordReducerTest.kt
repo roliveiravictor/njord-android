@@ -190,7 +190,8 @@ class NjordReducerTest {
             drawdownStats = emptyList(),
             drawdownCurve = emptyList(),
             drawdownAxisLabels = emptyList(),
-            monthlyReturns = emptyList()
+            monthlyReturns = emptyList(),
+            latestClosedPositions = emptyList()
         )
         val state = reduce(NjordUiState(performanceLoading = true), NjordAction.PerformanceLoaded(snapshot))
 
