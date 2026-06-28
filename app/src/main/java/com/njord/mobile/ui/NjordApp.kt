@@ -1859,24 +1859,26 @@ private fun PerformanceRecentPositions(
     onPositionClick: (PerformancePosition) -> Unit
 ) {
     if (positions.isEmpty()) return
-    val listState = rememberLazyListState()
-    val firstVisible = listState.firstVisibleItemIndex
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("Latest closed")
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            LazyRow(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().testTag("performanceRecentPositionsCarousel"),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(positions) { position ->
-                    Box(Modifier.width(maxWidth)) {
-                        PerformancePositionCard(position) { onPositionClick(position) }
+        if (positions.size == 1) {
+            PerformancePositionCard(positions.first()) { onPositionClick(positions.first()) }
+        } else {
+            val listState = rememberLazyListState()
+            val firstVisible = listState.firstVisibleItemIndex
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                LazyRow(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().testTag("performanceRecentPositionsCarousel"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(positions) { position ->
+                        Box(Modifier.width(maxWidth)) {
+                            PerformancePositionCard(position) { onPositionClick(position) }
+                        }
                     }
                 }
             }
-        }
-        if (positions.size > 1) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -2812,9 +2814,17 @@ private fun nearestChartPointIndex(points: List<ChartPoint>, canvasSize: IntSize
 private fun LiveIncidentCarousel(incidents: List<Incident>, onIncidentClick: (Incident) -> Unit) {
     if (incidents.isEmpty()) return
 
+    if (incidents.size == 1) {
+        IncidentBanner(incidents.first()) { onIncidentClick(incidents.first()) }
+        return
+    }
+
+    val listState = rememberLazyListState()
+    val firstVisible = listState.firstVisibleItemIndex
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             LazyRow(
+                state = listState,
                 modifier = Modifier.fillMaxWidth().testTag("liveIncidentCarousel"),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -2834,9 +2844,9 @@ private fun LiveIncidentCarousel(incidents: List<Incident>, onIncidentClick: (In
                 Box(
                     Modifier
                         .padding(horizontal = 3.dp)
-                        .size(if (index == 0) 7.dp else 6.dp)
+                        .size(if (index == firstVisible) 7.dp else 6.dp)
                         .clip(CircleShape)
-                        .background(if (index == 0) Primary else Outline)
+                        .background(if (index == firstVisible) Primary else Outline)
                         .testTag("liveIncidentDot-$index")
                 )
             }
