@@ -19,6 +19,7 @@ enum class ApiCacheKey(val fileName: String) {
     Logs("logs.json"),
     Heartbeat("heartbeat.json"),
     HunchReport("hunch-report-latest.json"),
+    HunchReportsRecent("hunch-reports-recent.json"),
     Incidents("incidents.json"),
     IncidentAcknowledgements("incident-acknowledgements.json")
 }

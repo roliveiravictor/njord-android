@@ -122,6 +122,7 @@ import com.njord.mobile.api.ApiPayloadResult
 import com.njord.mobile.api.HeartbeatResult
 import com.njord.mobile.api.HomeResult
 import com.njord.mobile.api.HunchReportResult
+import com.njord.mobile.api.HunchReportsResult
 import com.njord.mobile.api.IncidentAcknowledgements
 import com.njord.mobile.api.LiveResult
 import com.njord.mobile.api.LogsResult
@@ -752,36 +753,36 @@ private suspend fun loadLogsData(context: Context, onAction: (NjordAction) -> Un
 }
 
 private suspend fun loadHunchReportData(context: Context, onAction: (NjordAction) -> Unit) {
-    suspend fun renderCachedHunchReport(cachedBody: String): Boolean =
-        when (val cached = NjordApiClient.parseHunchReportResponse(cachedBody)) {
-            is HunchReportResult.Success -> {
-                dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(cached.report)))
+    suspend fun renderCachedHunchReports(cachedBody: String): Boolean =
+        when (val cached = NjordApiClient.parseHunchReportsResponse(cachedBody)) {
+            is HunchReportsResult.Success -> {
+                dispatchUiAction(onAction, NjordAction.HunchReportLoaded(cached.reports.map(::mapApiReport)))
                 true
             }
-            is HunchReportResult.Error -> {
-                NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReport)
+            is HunchReportsResult.Error -> {
+                NjordApiCache.delete(context.filesDir, ApiCacheKey.HunchReportsRecent)
                 false
             }
             else -> false
         }
 
-    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
-        if (renderCachedHunchReport(cachedBody)) return
+    NjordApiCache.readFresh(context.filesDir, ApiCacheKey.HunchReportsRecent)?.let { cachedBody ->
+        if (renderCachedHunchReports(cachedBody)) return
     }
-    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReport)?.let { cachedBody ->
-        renderCachedHunchReport(cachedBody)
+    NjordApiCache.read(context.filesDir, ApiCacheKey.HunchReportsRecent)?.let { cachedBody ->
+        renderCachedHunchReports(cachedBody)
     }
-    when (val result = NjordApiClient.fetchHunchReportPayload(
+    when (val result = NjordApiClient.fetchRecentHunchReportsPayload(
         com.njord.mobile.BuildConfig.NJORD_API_BASE_URL,
         com.njord.mobile.BuildConfig.NJORD_API_KEY
     )) {
         is ApiPayloadResult.Success -> {
-            when (val parsed = NjordApiClient.parseHunchReportResponse(result.body)) {
-                is HunchReportResult.Success -> {
-                    NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReport, result.body)
-                    dispatchUiAction(onAction, NjordAction.HunchReportLoaded(mapApiReport(parsed.report)))
+            when (val parsed = NjordApiClient.parseHunchReportsResponse(result.body)) {
+                is HunchReportsResult.Success -> {
+                    NjordApiCache.write(context.filesDir, ApiCacheKey.HunchReportsRecent, result.body)
+                    dispatchUiAction(onAction, NjordAction.HunchReportLoaded(parsed.reports.map(::mapApiReport)))
                 }
-                is HunchReportResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                is HunchReportsResult.Error -> showApiParseFailureToast(context, result, parsed.message)
                 else -> {}
             }
         }
@@ -1102,36 +1103,74 @@ private fun LogsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
 
 @Composable
 private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
-    val report = state.hunchReport
+    val reports = state.hunchReports
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (report == null) {
-            NjordCard { Text("No Hunch report available yet.", color = TextMuted) }
-        } else {
-            ReportReferencePanel(report)
-            NjordCard {
-                Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                if (report.keyFactors.isEmpty()) {
-                    Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                } else {
-                    report.keyFactors.forEach { ReportFactorRow(it) }
+        when {
+            reports.isEmpty() -> NjordCard { Text("No Hunch report available yet.", color = TextMuted) }
+            reports.size == 1 -> ReportDetailPage(reports.first())
+            else -> {
+                val listState = rememberLazyListState()
+                val firstVisible = listState.firstVisibleItemIndex
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    LazyRow(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth().testTag("hunchReportsCarousel"),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(reports) { report ->
+                            Box(Modifier.width(maxWidth)) {
+                                ReportDetailPage(report)
+                            }
+                        }
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    reports.forEachIndexed { index, _ ->
+                        Box(
+                            Modifier
+                                .padding(horizontal = 3.dp)
+                                .size(if (index == firstVisible) 7.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(if (index == firstVisible) Primary else Outline)
+                        )
+                    }
                 }
             }
-            NjordCard {
-                Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                if (report.risks.isEmpty()) {
-                    Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                } else {
-                    report.risks.forEach { ReportFactorRow(it) }
-                }
+        }
+    }
+}
+
+@Composable
+private fun ReportDetailPage(report: HunchReport) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ReportReferencePanel(report)
+        NjordCard {
+            Text("Key factors", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+            if (report.keyFactors.isEmpty()) {
+                Text("No key factors reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.keyFactors.forEach { ReportFactorRow(it) }
             }
-            NjordCard {
-                Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
-                if (report.layerScores.isEmpty()) {
-                    Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                } else {
-                    report.layerScores.forEach { LayerScoreRow(it) }
-                }
+        }
+        NjordCard {
+            Text("Risks", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+            if (report.risks.isEmpty()) {
+                Text("No risks reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.risks.forEach { ReportFactorRow(it) }
+            }
+        }
+        NjordCard {
+            Text("Layer scores", color = TextPrimary, fontWeight = FontWeight.ExtraBold)
+            if (report.layerScores.isEmpty()) {
+                Text("No layer scores reported.", color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
+                report.layerScores.forEach { LayerScoreRow(it) }
             }
         }
     }

@@ -136,21 +136,21 @@ class NjordReducerTest {
     }
 
     @Test
-    fun hunchReportLoaded_replacesReportAndClearsLoading() {
+    fun hunchReportLoaded_replacesReportsAndClearsLoading() {
         val report = ReducerFixtures.hunchReport.copy(signal = "BUY", confidence = "MEDIUM")
-        val state = reduce(NjordUiState(hunchReportLoading = true), NjordAction.HunchReportLoaded(report))
+        val state = reduce(NjordUiState(hunchReportLoading = true), NjordAction.HunchReportLoaded(listOf(report)))
 
-        assertEquals(report, state.hunchReport)
+        assertEquals(listOf(report), state.hunchReports)
         assertFalse(state.hunchReportLoading)
         assertFalse(state.hunchReportError)
     }
 
     @Test
-    fun hunchReportError_setsErrorTrueAndKeepsFallbackReport() {
+    fun hunchReportError_setsErrorTrueAndKeepsFallbackReports() {
         val initial = NjordUiState(hunchReportLoading = true)
         val state = reduce(initial, NjordAction.HunchReportError)
 
-        assertEquals(initial.hunchReport, state.hunchReport)
+        assertEquals(initial.hunchReports, state.hunchReports)
         assertTrue(state.hunchReportError)
         assertFalse(state.hunchReportLoading)
     }

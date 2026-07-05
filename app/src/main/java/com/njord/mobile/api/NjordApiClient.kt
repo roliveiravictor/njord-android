@@ -33,6 +33,10 @@ data class HunchReportApiResponse(
     val layerScores: Map<String, Double?>
 )
 
+data class HunchReportListApiResponse(
+    val reports: List<HunchReportApiResponse>
+)
+
 data class HeartbeatApiService(
     val name: String,
     val displayName: String?,
@@ -295,6 +299,12 @@ sealed interface HunchReportResult {
     data class Error(val message: String) : HunchReportResult
 }
 
+sealed interface HunchReportsResult {
+    data object Loading : HunchReportsResult
+    data class Success(val reports: List<HunchReportApiResponse>) : HunchReportsResult
+    data class Error(val message: String) : HunchReportsResult
+}
+
 sealed interface ApiPayloadResult {
     data class Success(val body: String, val statusCode: Int, val path: String) : ApiPayloadResult
     data class Error(val statusCode: Int?, val path: String, val message: String) : ApiPayloadResult
@@ -351,6 +361,13 @@ object NjordApiClient {
         }
     }
 
+    fun fetchRecentHunchReports(baseUrl: String, apiKey: String): HunchReportsResult {
+        return when (val payload = fetchRecentHunchReportsPayload(baseUrl, apiKey)) {
+            is ApiPayloadResult.Success -> parseHunchReportsResponse(payload.body)
+            is ApiPayloadResult.Error -> HunchReportsResult.Error(payload.message)
+        }
+    }
+
     fun fetchHomePayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload("$baseUrl/v1/home", apiKey, "fetchHome")
 
@@ -371,6 +388,9 @@ object NjordApiClient {
 
     fun fetchHunchReportPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
         fetchPayload("$baseUrl/v1/reports/hunch?date=latest", apiKey, "fetchHunchReport")
+
+    fun fetchRecentHunchReportsPayload(baseUrl: String, apiKey: String): ApiPayloadResult =
+        fetchPayload("$baseUrl/v1/reports/hunch/recent?limit=3", apiKey, "fetchRecentHunchReports")
 
     private fun fetchPayload(url: String, apiKey: String, operation: String): ApiPayloadResult {
         Log.d("NjordApi", "$operation url=$url")
@@ -768,31 +788,46 @@ object NjordApiClient {
 
     internal fun parseHunchReportResponse(json: String): HunchReportResult {
         return try {
-            val root = JSONObject(json)
-            val date = root.optString("date").takeIf { it.isNotBlank() }
-                ?: return HunchReportResult.Error("Missing 'date' key")
-            val signal = root.optString("signal").takeIf { it.isNotBlank() }
-                ?: return HunchReportResult.Error("Missing 'signal' key")
-            HunchReportResult.Success(
-                HunchReportApiResponse(
-                    date = date,
-                    signal = signal,
-                    rawSignal = root.optionalString("raw_signal"),
-                    createdAt = root.optionalString("created_at"),
-                    confidence = root.optionalString("confidence"),
-                    score = root.optionalDouble("score"),
-                    btcPriceAtSignal = root.optionalDouble("btc_price_at_signal"),
-                    currentBtcPrice = root.optionalDouble("current_btc_price"),
-                    priceDeltaPct = root.optionalDouble("price_delta_pct"),
-                    wasSignalCorrect = root.optionalBoolean("was_signal_correct"),
-                    keyFactors = root.optionalStringList("key_factors"),
-                    risks = root.optionalStringList("risks"),
-                    layerScores = root.optionalLayerScores()
-                )
-            )
+            val report = parseHunchReportObject(JSONObject(json))
+                ?: return HunchReportResult.Error("Missing 'date' or 'signal' key")
+            HunchReportResult.Success(report)
         } catch (e: Exception) {
             HunchReportResult.Error(e.message ?: "Parse error")
         }
+    }
+
+    internal fun parseHunchReportsResponse(json: String): HunchReportsResult {
+        return try {
+            val root = JSONObject(json)
+            val reportsArray = root.optJSONArray("reports")
+                ?: return HunchReportsResult.Error("Missing 'reports' key")
+            val reports = (0 until reportsArray.length()).mapNotNull { i ->
+                reportsArray.optJSONObject(i)?.let(::parseHunchReportObject)
+            }
+            HunchReportsResult.Success(reports)
+        } catch (e: Exception) {
+            HunchReportsResult.Error(e.message ?: "Parse error")
+        }
+    }
+
+    private fun parseHunchReportObject(root: JSONObject): HunchReportApiResponse? {
+        val date = root.optString("date").takeIf { it.isNotBlank() } ?: return null
+        val signal = root.optString("signal").takeIf { it.isNotBlank() } ?: return null
+        return HunchReportApiResponse(
+            date = date,
+            signal = signal,
+            rawSignal = root.optionalString("raw_signal"),
+            createdAt = root.optionalString("created_at"),
+            confidence = root.optionalString("confidence"),
+            score = root.optionalDouble("score"),
+            btcPriceAtSignal = root.optionalDouble("btc_price_at_signal"),
+            currentBtcPrice = root.optionalDouble("current_btc_price"),
+            priceDeltaPct = root.optionalDouble("price_delta_pct"),
+            wasSignalCorrect = root.optionalBoolean("was_signal_correct"),
+            keyFactors = root.optionalStringList("key_factors"),
+            risks = root.optionalStringList("risks"),
+            layerScores = root.optionalLayerScores()
+        )
     }
 
     private fun openConnection(url: String, apiKey: String): HttpURLConnection =

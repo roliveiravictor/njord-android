@@ -64,7 +64,7 @@ data class NjordUiState(
     val heartbeatTotalCount: Int = 0,
     val heartbeatLoading: Boolean = false,
     val heartbeatError: Boolean = false,
-    val hunchReport: HunchReport? = null,
+    val hunchReports: List<HunchReport> = emptyList(),
     val hunchReportLoading: Boolean = false,
     val hunchReportError: Boolean = false,
     val performanceSnapshot: PerformanceSnapshot? = null,
@@ -129,7 +129,7 @@ sealed interface NjordAction {
     ) : NjordAction
     data object HeartbeatError : NjordAction
     data object HunchReportLoading : NjordAction
-    data class HunchReportLoaded(val report: HunchReport) : NjordAction
+    data class HunchReportLoaded(val reports: List<HunchReport>) : NjordAction
     data object HunchReportError : NjordAction
     data object PerformanceLoading : NjordAction
     data class PerformanceLoaded(val snapshot: PerformanceSnapshot) : NjordAction
@@ -221,7 +221,7 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
         NjordAction.HeartbeatError -> state.copy(heartbeatLoading = false, heartbeatError = true)
         NjordAction.HunchReportLoading -> state.copy(hunchReportLoading = true, hunchReportError = false)
         is NjordAction.HunchReportLoaded -> state.copy(
-            hunchReport = action.report,
+            hunchReports = action.reports,
             hunchReportLoading = false,
             hunchReportError = false
         )

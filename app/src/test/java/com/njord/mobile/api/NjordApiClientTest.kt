@@ -927,6 +927,60 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun parseHunchReportsResponse_wellFormedJson_returnsSuccessWithReports() {
+        val json = """
+            {
+              "reports": [
+                {"date":"2026-06-12","signal":"BEARISH","raw_signal":"SELL"},
+                {"date":"2026-06-11","signal":"BULLISH","raw_signal":"BUY"},
+                {"date":"2026-06-10","signal":"NEUTRAL","raw_signal":"NEUTRAL"}
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHunchReportsResponse(json)
+
+        assertTrue(result is HunchReportsResult.Success)
+        val reports = (result as HunchReportsResult.Success).reports
+        assertEquals(3, reports.size)
+        assertEquals(listOf("2026-06-12", "2026-06-11", "2026-06-10"), reports.map { it.date })
+    }
+
+    @Test
+    fun parseHunchReportsResponse_emptyReportsArray_returnsSuccessWithEmptyList() {
+        val result = NjordApiClient.parseHunchReportsResponse("""{"reports":[]}""")
+
+        assertTrue(result is HunchReportsResult.Success)
+        assertEquals(emptyList<HunchReportApiResponse>(), (result as HunchReportsResult.Success).reports)
+    }
+
+    @Test
+    fun parseHunchReportsResponse_missingReportsKey_returnsError() {
+        val result = NjordApiClient.parseHunchReportsResponse("""{}""")
+
+        assertTrue(result is HunchReportsResult.Error)
+    }
+
+    @Test
+    fun parseHunchReportsResponse_skipsMalformedEntries() {
+        val json = """
+            {
+              "reports": [
+                {"date":"2026-06-12","signal":"BEARISH"},
+                {"date":"2026-06-11"}
+              ]
+            }
+        """.trimIndent()
+
+        val result = NjordApiClient.parseHunchReportsResponse(json)
+
+        assertTrue(result is HunchReportsResult.Success)
+        val reports = (result as HunchReportsResult.Success).reports
+        assertEquals(1, reports.size)
+        assertEquals("2026-06-12", reports.single().date)
+    }
+
+    @Test
     fun mapApiReport_formatsReportForUi() {
         val apiReport = HunchReportApiResponse(
             date = "2026-06-12",
