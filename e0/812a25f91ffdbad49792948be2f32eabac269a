@@ -1,0 +1,26 @@
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_3694ceb3684891::t_4839bba32a8f55 1690,2402-2403,2435-2437
+  s_3694ceb3684891::t_96d320612a66a0 515-518,522-525,714-717,721-724,824,1042-1043,1695,1702,1707-1708
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_3694ceb3684891::t_a4f50339f5c448 1232,1274,1281,1283
+  s_3694ceb3684891::t_c43f10474b911f 1230,1246-1273,1275-1280,1282
+  s_3694ceb3684891::t_8e210f8165d971 1284
+app/src/main/java/com/njord/mobile/api/HeartbeatMapper.kt
+  s_3694ceb3684891::t_2ddda15dbdf7f2 22-48,50-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "e0812a25f91ffdbad49792948be2f32eabac269a",
+  "prompts": {},
+  "sessions": {
+    "s_3694ceb3684891": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3d0b-dd34-7660-a1b5-38a8ae3e822f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
