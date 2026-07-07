@@ -16,7 +16,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,9 +34,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -1110,36 +1109,51 @@ private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) 
             reports.isEmpty() -> NjordCard { Text("No Hunch report available yet.", color = TextMuted) }
             reports.size == 1 -> ReportDetailPage(reports.first())
             else -> {
-                val listState = rememberLazyListState()
-                val firstVisible = listState.firstVisibleItemIndex
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    LazyRow(
-                        state = listState,
-                        modifier = Modifier.fillMaxWidth().testTag("hunchReportsCarousel"),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(reports) { report ->
-                            Box(Modifier.width(maxWidth)) {
-                                ReportDetailPage(report)
-                            }
-                        }
-                    }
-                }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                FixedCardPager(
+                    pageCount = reports.size,
+                    testTag = "hunchReportsCarousel"
                 ) {
-                    reports.forEachIndexed { index, _ ->
-                        Box(
-                            Modifier
-                                .padding(horizontal = 3.dp)
-                                .size(if (index == firstVisible) 7.dp else 6.dp)
-                                .clip(CircleShape)
-                                .background(if (index == firstVisible) Primary else Outline)
-                        )
-                    }
+                    ReportDetailPage(reports[it])
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FixedCardPager(
+    pageCount: Int,
+    testTag: String,
+    dotTestTagPrefix: String? = null,
+    pageContent: @Composable (Int) -> Unit
+) {
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    val selectedPage = pagerState.currentPage.coerceIn(0, pageCount - 1)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth().testTag(testTag)
+        ) { page ->
+            Box(Modifier.fillMaxWidth()) {
+                pageContent(page)
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            repeat(pageCount) { index ->
+                var dotModifier = Modifier
+                    .padding(horizontal = 3.dp)
+                    .size(if (index == selectedPage) 7.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(if (index == selectedPage) Primary else Outline)
+                if (dotTestTagPrefix != null) {
+                    dotModifier = dotModifier.testTag("$dotTestTagPrefix-$index")
+                }
+                Box(dotModifier)
             }
         }
     }
@@ -1903,35 +1917,12 @@ private fun PerformanceRecentPositions(
         if (positions.size == 1) {
             PerformancePositionCard(positions.first()) { onPositionClick(positions.first()) }
         } else {
-            val listState = rememberLazyListState()
-            val firstVisible = listState.firstVisibleItemIndex
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                LazyRow(
-                    state = listState,
-                    modifier = Modifier.fillMaxWidth().testTag("performanceRecentPositionsCarousel"),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(positions) { position ->
-                        Box(Modifier.width(maxWidth)) {
-                            PerformancePositionCard(position) { onPositionClick(position) }
-                        }
-                    }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+            FixedCardPager(
+                pageCount = positions.size,
+                testTag = "performanceRecentPositionsCarousel"
             ) {
-                positions.forEachIndexed { index, _ ->
-                    Box(
-                        Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(if (index == firstVisible) 7.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(if (index == firstVisible) Primary else Outline)
-                    )
-                }
+                val position = positions[it]
+                PerformancePositionCard(position) { onPositionClick(position) }
             }
         }
     }
@@ -2858,37 +2849,14 @@ private fun LiveIncidentCarousel(incidents: List<Incident>, onIncidentClick: (In
         return
     }
 
-    val listState = rememberLazyListState()
-    val firstVisible = listState.firstVisibleItemIndex
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            LazyRow(
-                state = listState,
-                modifier = Modifier.fillMaxWidth().testTag("liveIncidentCarousel"),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(incidents, key = { it.id }) { incident ->
-                    Box(Modifier.width(maxWidth)) {
-                        IncidentBanner(incident) { onIncidentClick(incident) }
-                    }
-                }
-            }
-        }
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+        FixedCardPager(
+            pageCount = incidents.size,
+            testTag = "liveIncidentCarousel",
+            dotTestTagPrefix = "liveIncidentDot"
         ) {
-            incidents.forEachIndexed { index, _ ->
-                Box(
-                    Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(if (index == firstVisible) 7.dp else 6.dp)
-                        .clip(CircleShape)
-                        .background(if (index == firstVisible) Primary else Outline)
-                        .testTag("liveIncidentDot-$index")
-                )
-            }
+            val incident = incidents[it]
+            IncidentBanner(incident) { onIncidentClick(incident) }
         }
     }
 }
