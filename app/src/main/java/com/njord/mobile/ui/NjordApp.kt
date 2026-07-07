@@ -429,7 +429,10 @@ private fun launchLoadForDestination(
     scope: CoroutineScope
 ) {
     when (state.destination) {
-        Destination.Home -> scope.launch(Dispatchers.IO) { loadHomeData(context, onAction) }
+        Destination.Home -> {
+            scope.launch(Dispatchers.IO) { loadHomeData(context, onAction) }
+            scope.launch(Dispatchers.IO) { loadHeartbeatData(context, onAction) }
+        }
         Destination.Live -> {
             val strategy = liveApiStrategy(state.liveStrategyFilter)
             val cacheKey = liveCacheKey(state.liveStrategyFilter)
@@ -821,7 +824,15 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         HomeActivityCard(snapshot?.activitySummary) { onAction(NjordAction.Navigate(Destination.Activity)) }
 
         SectionTitle("Heartbeat")
-        HomeHeartbeatCard(snapshot, state.homeError) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
+        HomeHeartbeatCard(
+            snapshot = snapshot,
+            heartbeatHealthyCount = state.heartbeatHealthyCount,
+            heartbeatLateCount = state.heartbeatLateCount,
+            heartbeatCriticalCount = state.heartbeatCriticalCount,
+            heartbeatTotalCount = state.heartbeatTotalCount,
+            validationError = state.heartbeatError || (state.heartbeatTotalCount == 0 && state.homeError),
+            onClick = { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
+        )
 
         SectionTitle("Logs")
         HomeLogsCard(snapshot?.logsSummary) { onAction(NjordAction.Navigate(Destination.Logs)) }
@@ -1039,8 +1050,7 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
             healthyCount = state.heartbeatHealthyCount,
             lateCount = state.heartbeatLateCount,
             criticalCount = state.heartbeatCriticalCount,
-            totalCount = state.heartbeatTotalCount,
-            validationError = state.heartbeatError
+            totalCount = state.heartbeatTotalCount
         )
         Text(
             "Service routines",
@@ -1687,25 +1697,38 @@ private fun HomeActivityCard(summary: ActivitySummary?, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, validationError: Boolean, onClick: () -> Unit) {
-    val healthy = snapshot?.heartbeatHealthy ?: 0
-    val total = snapshot?.heartbeatTotal ?: 0
-    val lateCount = snapshot?.heartbeatLateCount ?: 0
+private fun HomeHeartbeatCard(
+    snapshot: HomeSnapshot?,
+    heartbeatHealthyCount: Int,
+    heartbeatLateCount: Int,
+    heartbeatCriticalCount: Int,
+    heartbeatTotalCount: Int,
+    validationError: Boolean,
+    onClick: () -> Unit
+) {
+    val hasHeartbeatSnapshot = heartbeatTotalCount > 0
+    val healthy = if (hasHeartbeatSnapshot) heartbeatHealthyCount else snapshot?.heartbeatHealthy ?: 0
+    val total = if (hasHeartbeatSnapshot) heartbeatTotalCount else snapshot?.heartbeatTotal ?: 0
+    val unhealthyCount = if (hasHeartbeatSnapshot) {
+        heartbeatLateCount + heartbeatCriticalCount
+    } else {
+        snapshot?.heartbeatLateCount ?: 0
+    }
     val subtitle = when {
         validationError -> "Health check unavailable"
         total == 0 -> "No service health available"
-        lateCount == 0 -> "All monitored routines healthy"
-        lateCount == 1 -> "1 routine late"
-        else -> "$lateCount routines late"
+        unhealthyCount == 0 -> "All monitored routines healthy"
+        unhealthyCount == 1 -> "1 routine needs attention"
+        else -> "$unhealthyCount routines need attention"
     }
     val badge = when {
         validationError -> "Offline"
-        lateCount == 0 -> "OK"
-        lateCount == 1 -> "1 late"
-        else -> "$lateCount late"
+        unhealthyCount == 0 -> "OK"
+        unhealthyCount == 1 -> "1 issue"
+        else -> "$unhealthyCount issues"
     }
-    val badgeTone = if (!validationError && lateCount == 0 && total > 0) Tone.Success else Tone.Warning
-    val allHeartbeatsFine = !validationError && total > 0 && healthy == total && lateCount == 0
+    val badgeTone = if (!validationError && unhealthyCount == 0 && total > 0) Tone.Success else Tone.Warning
+    val allHeartbeatsFine = !validationError && total > 0 && healthy == total && unhealthyCount == 0
     val accountabilityIncomplete = total > 0 && !allHeartbeatsFine
     val gradientColors = when {
         allHeartbeatsFine -> listOf(
@@ -2399,8 +2422,7 @@ private fun HeartbeatHealthCard(
     healthyCount: Int,
     lateCount: Int,
     criticalCount: Int,
-    totalCount: Int,
-    validationError: Boolean
+    totalCount: Int
 ) {
     Column(
         modifier = Modifier
@@ -2432,9 +2454,6 @@ private fun HeartbeatHealthCard(
                 modifier = Modifier.weight(1f)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (validationError) {
-                    HeartbeatStatusPill("check failed", Tone.Warning)
-                }
                 HeartbeatStatusPill("$healthyCount OK", Tone.Success)
                 HeartbeatStatusPill("$lateCount late", Tone.Warning)
                 HeartbeatStatusPill("$criticalCount critical", Tone.Danger)
