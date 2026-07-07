@@ -1,0 +1,22 @@
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_96999a0f470cc2::t_0e0bcbb573ff60 38-39,1112-1114,1116,1920-1922,1924-1925,2853-2856,2858-2859
+  s_96999a0f470cc2::t_b98cd7ac1fa7ea 1118-1119,1124-1154,1156
+  s_96999a0f470cc2::t_df99603e1844a3 1117
+  s_96999a0f470cc2::t_63434bc7fd191f 1120-1123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c72092aa2f72217053b01f015a40141fb973d93d",
+  "prompts": {},
+  "sessions": {
+    "s_96999a0f470cc2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3cd6-fd02-7260-97b7-53cfb50f6a6b",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
