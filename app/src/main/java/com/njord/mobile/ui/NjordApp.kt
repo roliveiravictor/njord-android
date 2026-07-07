@@ -512,11 +512,17 @@ private suspend fun loadHomeData(context: Context, onAction: (NjordAction) -> Un
                     }
                     dispatchUiAction(onAction, NjordAction.HomeLoaded(snapshot))
                 }
-                is HomeResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                is HomeResult.Error -> {
+                    showApiParseFailureToast(context, result, parsed.message)
+                    dispatchUiAction(onAction, NjordAction.HomeError)
+                }
                 else -> {}
             }
         }
-        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+        is ApiPayloadResult.Error -> {
+            showApiFailureToast(context, result)
+            dispatchUiAction(onAction, NjordAction.HomeError)
+        }
     }
 }
 
@@ -705,11 +711,17 @@ private suspend fun loadHeartbeatData(context: Context, onAction: (NjordAction) 
                         )
                     )
                 }
-                is HeartbeatResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                is HeartbeatResult.Error -> {
+                    showApiParseFailureToast(context, result, parsed.message)
+                    dispatchUiAction(onAction, NjordAction.HeartbeatError)
+                }
                 else -> {}
             }
         }
-        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+        is ApiPayloadResult.Error -> {
+            showApiFailureToast(context, result)
+            dispatchUiAction(onAction, NjordAction.HeartbeatError)
+        }
     }
 }
 
@@ -809,7 +821,7 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
         HomeActivityCard(snapshot?.activitySummary) { onAction(NjordAction.Navigate(Destination.Activity)) }
 
         SectionTitle("Heartbeat")
-        HomeHeartbeatCard(snapshot) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
+        HomeHeartbeatCard(snapshot, state.homeError) { onAction(NjordAction.Navigate(Destination.Heartbeat)) }
 
         SectionTitle("Logs")
         HomeLogsCard(snapshot?.logsSummary) { onAction(NjordAction.Navigate(Destination.Logs)) }
@@ -1027,7 +1039,8 @@ private fun HeartbeatScreen(state: NjordUiState, onAction: (NjordAction) -> Unit
             healthyCount = state.heartbeatHealthyCount,
             lateCount = state.heartbeatLateCount,
             criticalCount = state.heartbeatCriticalCount,
-            totalCount = state.heartbeatTotalCount
+            totalCount = state.heartbeatTotalCount,
+            validationError = state.heartbeatError
         )
         Text(
             "Service routines",
@@ -1674,23 +1687,25 @@ private fun HomeActivityCard(summary: ActivitySummary?, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, onClick: () -> Unit) {
+private fun HomeHeartbeatCard(snapshot: HomeSnapshot?, validationError: Boolean, onClick: () -> Unit) {
     val healthy = snapshot?.heartbeatHealthy ?: 0
     val total = snapshot?.heartbeatTotal ?: 0
     val lateCount = snapshot?.heartbeatLateCount ?: 0
     val subtitle = when {
+        validationError -> "Health check unavailable"
         total == 0 -> "No service health available"
         lateCount == 0 -> "All monitored routines healthy"
         lateCount == 1 -> "1 routine late"
         else -> "$lateCount routines late"
     }
     val badge = when {
+        validationError -> "Offline"
         lateCount == 0 -> "OK"
         lateCount == 1 -> "1 late"
         else -> "$lateCount late"
     }
-    val badgeTone = if (lateCount == 0 && total > 0) Tone.Success else Tone.Warning
-    val allHeartbeatsFine = total > 0 && healthy == total && lateCount == 0
+    val badgeTone = if (!validationError && lateCount == 0 && total > 0) Tone.Success else Tone.Warning
+    val allHeartbeatsFine = !validationError && total > 0 && healthy == total && lateCount == 0
     val accountabilityIncomplete = total > 0 && !allHeartbeatsFine
     val gradientColors = when {
         allHeartbeatsFine -> listOf(
@@ -2384,7 +2399,8 @@ private fun HeartbeatHealthCard(
     healthyCount: Int,
     lateCount: Int,
     criticalCount: Int,
-    totalCount: Int
+    totalCount: Int,
+    validationError: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -2416,6 +2432,9 @@ private fun HeartbeatHealthCard(
                 modifier = Modifier.weight(1f)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (validationError) {
+                    HeartbeatStatusPill("check failed", Tone.Warning)
+                }
                 HeartbeatStatusPill("$healthyCount OK", Tone.Success)
                 HeartbeatStatusPill("$lateCount late", Tone.Warning)
                 HeartbeatStatusPill("$criticalCount critical", Tone.Danger)

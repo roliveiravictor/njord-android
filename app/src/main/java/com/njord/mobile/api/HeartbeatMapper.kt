@@ -19,26 +19,49 @@ data class HeartbeatSnapshot(
     val routines: List<HeartbeatRoutine>
 )
 
-internal fun mapApiHeartbeat(result: HeartbeatResult.Success): HeartbeatSnapshot =
-    HeartbeatSnapshot(
-        healthyCount = result.healthyCount,
-        lateCount = result.lateCount,
-        criticalCount = result.criticalCount,
-        totalCount = result.totalCount,
-        routines = result.services
-            .sortedBy { service -> service.status.toHeartbeatSortRank() }
-            .map { service ->
-                HeartbeatRoutine(
-                    name = service.toRoutineName(),
-                    status = service.status.toHeartbeatLabel(),
-                    lastSeenAt = service.lastSeenAt?.toInstantOrNull(),
-                    cadence = service.expectedCadenceSeconds.toCadenceLabel(),
-                    tone = service.status.toHeartbeatTone(),
-                    secondsOverdue = service.secondsOverdue,
-                    expectedCadenceSeconds = service.expectedCadenceSeconds
-                )
-            }
+internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Instant.now()): HeartbeatSnapshot {
+    val routines = result.services
+        .map { service -> service.toRoutine(now) }
+        .sortedBy { routine -> routine.status.toHeartbeatSortRank() }
+
+    return HeartbeatSnapshot(
+        healthyCount = routines.count { it.status.equals("Healthy", ignoreCase = true) },
+        lateCount = routines.count { it.status.equals("Late", ignoreCase = true) },
+        criticalCount = routines.count { it.status.equals("Critical", ignoreCase = true) },
+        totalCount = result.totalCount.coerceAtLeast(routines.size),
+        routines = routines
     )
+}
+
+private fun HeartbeatApiService.toRoutine(now: Instant): HeartbeatRoutine {
+    val lastSeen = lastSeenAt?.toInstantOrNull()
+    val localSecondsOverdue = localSecondsOverdue(now, lastSeen, expectedCadenceSeconds)
+    val effectiveStatus = status.toDeviceClockStatus(localSecondsOverdue, expectedCadenceSeconds)
+
+    return HeartbeatRoutine(
+        name = toRoutineName(),
+        status = effectiveStatus.toHeartbeatLabel(),
+        lastSeenAt = lastSeen,
+        cadence = expectedCadenceSeconds.toCadenceLabel(),
+        tone = effectiveStatus.toHeartbeatTone(),
+        secondsOverdue = localSecondsOverdue ?: secondsOverdue,
+        expectedCadenceSeconds = expectedCadenceSeconds
+    )
+}
+
+private fun localSecondsOverdue(now: Instant, lastSeenAt: Instant?, expectedCadenceSeconds: Int): Int? {
+    if (lastSeenAt == null || expectedCadenceSeconds <= 0) return null
+    val elapsedSeconds = Duration.between(lastSeenAt, now).seconds.coerceAtLeast(0)
+    return (elapsedSeconds - expectedCadenceSeconds).coerceAtLeast(0).toInt()
+}
+
+private fun String.toDeviceClockStatus(secondsOverdue: Int?, expectedCadenceSeconds: Int): String =
+    when {
+        equals("critical", ignoreCase = true) -> "critical"
+        secondsOverdue == null || secondsOverdue == 0 -> lowercase()
+        expectedCadenceSeconds > 0 && secondsOverdue > expectedCadenceSeconds -> "critical"
+        else -> "late"
+    }
 
 private fun HeartbeatApiService.toRoutineName(): String {
     val source = displayName ?: name.replace('_', ' ').replace('-', ' ')

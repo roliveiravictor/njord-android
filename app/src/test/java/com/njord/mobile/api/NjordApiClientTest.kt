@@ -1227,9 +1227,9 @@ class NjordApiClientTest {
             )
         )
 
-        val snapshot = mapApiHeartbeat(apiResult)
+        val snapshot = mapApiHeartbeat(apiResult, now = Instant.parse("2026-06-12T14:25:00Z"))
 
-        assertEquals(7, snapshot.healthyCount)
+        assertEquals(1, snapshot.healthyCount)
         assertEquals(1, snapshot.lateCount)
         assertEquals(0, snapshot.criticalCount)
         assertEquals(8, snapshot.totalCount)
@@ -1242,5 +1242,44 @@ class NjordApiClientTest {
         assertEquals(null, snapshot.routines[1].lastSeenAt)
         assertEquals("Late", snapshot.routines[2].status)
         assertEquals("7d", snapshot.routines[2].cadence)
+    }
+
+    @Test
+    fun mapApiHeartbeat_recomputesStatusAndCountsFromDeviceClock() {
+        val apiResult = HeartbeatResult.Success(
+            healthyCount = 8,
+            lateCount = 0,
+            criticalCount = 0,
+            totalCount = 8,
+            services = listOf(
+                HeartbeatApiService(
+                    name = "candle_close_liveness",
+                    displayName = "Candle close liveness",
+                    status = "healthy",
+                    lastSeenAt = "2026-06-12T14:00:00Z",
+                    expectedCadenceSeconds = 1200,
+                    secondsOverdue = null
+                ),
+                HeartbeatApiService(
+                    name = "activity_snapshot",
+                    displayName = "Activity snapshot",
+                    status = "healthy",
+                    lastSeenAt = "2026-06-12T13:00:00Z",
+                    expectedCadenceSeconds = 1200,
+                    secondsOverdue = null
+                )
+            )
+        )
+
+        val snapshot = mapApiHeartbeat(apiResult, now = Instant.parse("2026-06-12T14:35:00Z"))
+
+        assertEquals(0, snapshot.healthyCount)
+        assertEquals(1, snapshot.lateCount)
+        assertEquals(1, snapshot.criticalCount)
+        assertEquals(8, snapshot.totalCount)
+        assertEquals("Late", snapshot.routines[0].status)
+        assertEquals(900, snapshot.routines[0].secondsOverdue)
+        assertEquals("Critical", snapshot.routines[1].status)
+        assertEquals(4500, snapshot.routines[1].secondsOverdue)
     }
 }
