@@ -211,6 +211,28 @@ class NjordReducerTest {
     }
 
     @Test
+    fun homeError_marksCachedStrategiesOffline() {
+        val strategy = StrategySummary(
+            name = "Big Bang",
+            filter = StrategyFilter.BigBang,
+            subtitle = "1 position",
+            pnl = "+\$42",
+            pct = "+1.2%",
+            live = true,
+            assets = "HYPE"
+        )
+        val initial = NjordUiState(
+            homeLoading = true,
+            homeSnapshot = ReducerFixtures.homeSnapshot.copy(strategies = listOf(strategy))
+        )
+        val state = reduce(initial, NjordAction.HomeError)
+
+        assertFalse(state.homeSnapshot?.strategies.orEmpty().single().live)
+        assertTrue(state.homeError)
+        assertFalse(state.homeLoading)
+    }
+
+    @Test
     fun heartbeatLoading_setsLoadingTrueAndErrorFalse() {
         val state = reduce(NjordUiState(heartbeatError = true), NjordAction.HeartbeatLoading)
 

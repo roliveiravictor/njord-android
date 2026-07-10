@@ -577,11 +577,17 @@ private suspend fun loadLiveData(context: Context, onAction: (NjordAction) -> Un
                     }
                     dispatchUiAction(onAction, NjordAction.LiveLoaded(livePositions, liveAnalytics, liveIncidents))
                 }
-                is LiveResult.Error -> showApiParseFailureToast(context, result, parsed.message)
+                is LiveResult.Error -> {
+                    showApiParseFailureToast(context, result, parsed.message)
+                    dispatchUiAction(onAction, NjordAction.LiveError)
+                }
                 else -> {}
             }
         }
-        is ApiPayloadResult.Error -> showApiFailureToast(context, result)
+        is ApiPayloadResult.Error -> {
+            showApiFailureToast(context, result)
+            dispatchUiAction(onAction, NjordAction.LiveError)
+        }
     }
 }
 
@@ -1650,7 +1656,7 @@ private fun HomeStrategyCard(summary: StrategySummary, onClick: () -> Unit) {
                 Text(summary.subtitle, color = TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
-                SmallLiveDot()
+                SmallLiveDot(isLive = summary.live)
                 if (summary.pnl.isNotBlank() || summary.pct.isNotBlank()) {
                     Spacer(Modifier.height(28.dp))
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
@@ -1915,7 +1921,8 @@ private fun HomeIncidentLine(label: String, time: String) {
 }
 
 @Composable
-private fun SmallLiveDot() {
+private fun SmallLiveDot(isLive: Boolean) {
+    val color = if (isLive) Success else Danger
     val pulse by rememberInfiniteTransition(label = "liveDotPulse").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -1937,16 +1944,16 @@ private fun SmallLiveDot() {
             Modifier
                 .size(pulseSize)
                 .clip(CircleShape)
-                .background(Success.copy(alpha = pulseAlpha))
+                .background(color.copy(alpha = pulseAlpha))
         )
         Box(
             Modifier
                 .size(14.dp)
                 .clip(CircleShape)
-                .background(Success.copy(alpha = 0.22f)),
+                .background(color.copy(alpha = 0.22f)),
             contentAlignment = Alignment.Center
         ) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(Success))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(color))
         }
     }
 }

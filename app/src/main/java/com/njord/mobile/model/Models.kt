@@ -150,6 +150,9 @@ private fun mergeIncidentsById(
     return visibleExisting + incoming.filter { it.id !in dismissedIds && it.id !in existingIds }
 }
 
+private fun HomeSnapshot.withStrategiesOffline(): HomeSnapshot =
+    copy(strategies = strategies.map { it.copy(live = false) })
+
 fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
     when (action) {
         is NjordAction.Navigate -> state.copy(
@@ -242,7 +245,11 @@ fun reduce(state: NjordUiState, action: NjordAction): NjordUiState =
             homeLoading = false,
             homeError = false
         )
-        NjordAction.HomeError -> state.copy(homeLoading = false, homeError = true)
+        NjordAction.HomeError -> state.copy(
+            homeSnapshot = state.homeSnapshot?.withStrategiesOffline(),
+            homeLoading = false,
+            homeError = true
+        )
     }
 
 fun visibleLivePositions(
