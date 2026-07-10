@@ -1,0 +1,26 @@
+app/src/test/java/com/njord/mobile/model/NjordReducerTest.kt
+  s_a1061410225af3::t_aff0420594b292 214-218,220-234
+  s_a1061410225af3::t_5b1d6bef5cd7e7 219
+  s_a1061410225af3::t_9b65571c2d94fd 213
+app/src/main/java/com/njord/mobile/model/Models.kt
+  s_a1061410225af3::t_d8708636dbe78b 153-155,248-251
+  s_a1061410225af3::t_7d79011c5d1bf7 252
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_a1061410225af3::t_2326c6988dbeec 580-583,587-590,1659,1924-1925,1947,1953,1956
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "31e86175af4927ed51c3c35427b0f481b109628a",
+  "prompts": {},
+  "sessions": {
+    "s_a1061410225af3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4e67-0f89-72f3-bc37-4795a505c1a2",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
