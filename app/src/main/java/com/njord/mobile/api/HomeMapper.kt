@@ -3,6 +3,7 @@ package com.njord.mobile.api
 import com.njord.mobile.model.ActivitySummary
 import com.njord.mobile.model.HomeLogsSummary
 import com.njord.mobile.model.HomeSnapshot
+import com.njord.mobile.model.StrategyFilter
 import com.njord.mobile.model.StrategySummary
 import java.text.NumberFormat
 import java.time.Instant
@@ -45,12 +46,21 @@ internal fun mapApiHome(response: HomeApiResponse, now: Instant = Instant.now())
 private fun mapHomeStrategy(strategy: HomeApiStrategy): StrategySummary =
     StrategySummary(
         name = strategy.name,
+        filter = strategy.name.toStrategyFilter(),
         subtitle = "${strategy.positionCount} ${if (strategy.positionCount == 1) "position" else "positions"}",
         pnl = strategy.unrealizedPnl?.let(::formatSignedCurrency).orEmpty(),
         pct = strategy.unrealizedPnlPct?.let { "${formatSignedNumber(it)}%" }.orEmpty(),
         live = strategy.isLive,
         assets = strategy.symbols.joinToString(" · ").takeIf { it.isNotBlank() }
     )
+
+private fun String.toStrategyFilter(): StrategyFilter =
+    when (lowercase().replace("_", " ").replace("-", " ").trim()) {
+        "big bang" -> StrategyFilter.BigBang
+        "wcr" -> StrategyFilter.Wcr
+        "hunch" -> StrategyFilter.Hunch
+        else -> StrategyFilter.All
+    }
 
 private fun formatSignedCurrency(value: Double): String {
     val formatted = USD_FORMATTER.format(abs(value))

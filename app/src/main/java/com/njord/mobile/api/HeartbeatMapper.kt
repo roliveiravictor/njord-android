@@ -36,7 +36,11 @@ internal fun mapApiHeartbeat(result: HeartbeatResult.Success, now: Instant = Ins
 private fun HeartbeatApiService.toRoutine(now: Instant): HeartbeatRoutine {
     val lastSeen = lastSeenAt?.toInstantOrNull()
     val localSecondsOverdue = localSecondsOverdue(now, lastSeen, expectedCadenceSeconds)
-    val effectiveStatus = status.toDeviceClockStatus(localSecondsOverdue, expectedCadenceSeconds)
+    val effectiveStatus = if (isOptionalVpnHeartbeat()) {
+        status.lowercase()
+    } else {
+        status.toDeviceClockStatus(localSecondsOverdue, expectedCadenceSeconds)
+    }
 
     return HeartbeatRoutine(
         name = toRoutineName(),
@@ -48,6 +52,9 @@ private fun HeartbeatApiService.toRoutine(now: Instant): HeartbeatRoutine {
         expectedCadenceSeconds = expectedCadenceSeconds
     )
 }
+
+private fun HeartbeatApiService.isOptionalVpnHeartbeat(): Boolean =
+    name == "vpn_heartbeat" && status.equals("healthy", ignoreCase = true)
 
 private fun localSecondsOverdue(now: Instant, lastSeenAt: Instant?, expectedCadenceSeconds: Int): Int? {
     if (lastSeenAt == null || expectedCadenceSeconds <= 0) return null

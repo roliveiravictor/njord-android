@@ -186,6 +186,14 @@ class NjordApiClientTest {
                   "symbols": ["HYPE", "ETH"],
                   "unrealized_pnl": 212.0,
                   "unrealized_pnl_pct": 4.1
+                },
+                {
+                  "name": "Hunch",
+                  "is_live": true,
+                  "position_count": 1,
+                  "symbols": ["DOGE"],
+                  "unrealized_pnl": 25.0,
+                  "unrealized_pnl_pct": 5.0
                 }
               ],
               "latest_cycle": {
@@ -222,9 +230,12 @@ class NjordApiClientTest {
         assertTrue(result is HomeResult.Success)
         val response = (result as HomeResult.Success).response
         assertEquals(18420.0, response.totalBalance, 0.0001)
-        assertEquals(1, response.strategies.size)
+        assertEquals(2, response.strategies.size)
         assertEquals("Big Bang", response.strategies[0].name)
         assertEquals(listOf("HYPE", "ETH"), response.strategies[0].symbols)
+        assertEquals("Hunch", response.strategies[1].name)
+        assertEquals(listOf("DOGE"), response.strategies[1].symbols)
+        assertEquals(1, response.strategies[1].positionCount)
         assertEquals(2, response.latestCycle?.openedCount)
         assertEquals(7, response.heartbeat.healthy)
         assertEquals(8, response.heartbeat.total)
@@ -505,6 +516,14 @@ class NjordApiClientTest {
                     symbols = listOf("HYPE", "BTC", "ETH"),
                     unrealizedPnl = 184.0,
                     unrealizedPnlPct = 2.6
+                ),
+                HomeApiStrategy(
+                    name = "Hunch",
+                    isLive = true,
+                    positionCount = 1,
+                    symbols = listOf("DOGE"),
+                    unrealizedPnl = 25.0,
+                    unrealizedPnlPct = 5.0
                 )
             ),
             latestCycle = HomeApiCycle(
@@ -545,6 +564,11 @@ class NjordApiClientTest {
         assertEquals("HYPE · BTC · ETH", snapshot.strategies[0].assets)
         assertEquals("+\$184.00", snapshot.strategies[0].pnl)
         assertEquals("+2.6%", snapshot.strategies[0].pct)
+        assertEquals(StrategyFilter.Hunch, snapshot.strategies[1].filter)
+        assertEquals("1 position", snapshot.strategies[1].subtitle)
+        assertEquals("DOGE", snapshot.strategies[1].assets)
+        assertEquals("+\$25.00", snapshot.strategies[1].pnl)
+        assertEquals("+5.0%", snapshot.strategies[1].pct)
         assertEquals("WCR", snapshot.incidents.single().subtitle)
         assertEquals("5m", snapshot.incidents.single().age)
     }
@@ -1281,5 +1305,35 @@ class NjordApiClientTest {
         assertEquals(900, snapshot.routines[0].secondsOverdue)
         assertEquals("Critical", snapshot.routines[1].status)
         assertEquals(4500, snapshot.routines[1].secondsOverdue)
+    }
+
+    @Test
+    fun mapApiHeartbeat_keepsHealthyVpnHealthyWhenDeviceClockShowsOverdue() {
+        val apiResult = HeartbeatResult.Success(
+            healthyCount = 8,
+            lateCount = 0,
+            criticalCount = 0,
+            totalCount = 8,
+            services = listOf(
+                HeartbeatApiService(
+                    name = "vpn_heartbeat",
+                    displayName = "VPN heartbeat",
+                    status = "healthy",
+                    lastSeenAt = "2026-06-12T14:00:00Z",
+                    expectedCadenceSeconds = 1200,
+                    secondsOverdue = null
+                )
+            )
+        )
+
+        val snapshot = mapApiHeartbeat(apiResult, now = Instant.parse("2026-06-12T14:45:00Z"))
+
+        assertEquals(1, snapshot.healthyCount)
+        assertEquals(0, snapshot.lateCount)
+        assertEquals(0, snapshot.criticalCount)
+        assertEquals(8, snapshot.totalCount)
+        assertEquals("VPN", snapshot.routines.single().name)
+        assertEquals("Healthy", snapshot.routines.single().status)
+        assertEquals(1500, snapshot.routines.single().secondsOverdue)
     }
 }

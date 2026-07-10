@@ -297,6 +297,7 @@ data class HomeSnapshot(
 )
 data class StrategySummary(
     val name: String,
+    val filter: StrategyFilter,
     val subtitle: String,
     val pnl: String,
     val pct: String,

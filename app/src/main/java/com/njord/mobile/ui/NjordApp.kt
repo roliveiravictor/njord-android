@@ -104,6 +104,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.njord.mobile.model.ActivityAction
 import com.njord.mobile.model.Destination
@@ -817,7 +818,10 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
             NjordCard { Text("No strategy data available yet.", color = TextMuted, fontSize = 13.sp) }
         }
         strategies.forEach {
-            HomeStrategyCard(it) { onAction(NjordAction.Navigate(Destination.Live)) }
+            HomeStrategyCard(it) {
+                onAction(NjordAction.SetLiveStrategyFilter(it.filter))
+                onAction(NjordAction.Navigate(Destination.Live))
+            }
         }
 
         SectionTitle("Activity")
@@ -1134,7 +1138,8 @@ private fun ReportsScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) 
             else -> {
                 FixedCardPager(
                     pageCount = reports.size,
-                    testTag = "hunchReportsCarousel"
+                    testTag = "hunchReportsCarousel",
+                    pageSpacing = 12.dp
                 ) {
                     ReportDetailPage(reports[it])
                 }
@@ -1148,6 +1153,7 @@ private fun FixedCardPager(
     pageCount: Int,
     testTag: String,
     dotTestTagPrefix: String? = null,
+    pageSpacing: Dp = 0.dp,
     pageContent: @Composable (Int) -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { pageCount })
@@ -1156,7 +1162,8 @@ private fun FixedCardPager(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxWidth().testTag(testTag)
+            modifier = Modifier.fillMaxWidth().testTag(testTag),
+            pageSpacing = pageSpacing
         ) { page ->
             Box(Modifier.fillMaxWidth()) {
                 pageContent(page)
