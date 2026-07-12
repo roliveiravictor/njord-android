@@ -1187,6 +1187,12 @@ class NjordApiClientTest {
     }
 
     @Test
+    fun mapApiEntries_hunchMessageWithoutMetadata_assignsHunchStrategy() {
+        val entries = listOf(makeApiEntry("INFO", "", "[HUNCH] No free slots - skipping open", "2026-06-12T14:00:00"))
+        assertEquals(StrategyFilter.Hunch, mapApiEntries(entries)[0].strategy)
+    }
+
+    @Test
     fun mapApiEntries_unrecognizedTitle_assignsAllStrategy() {
         val entries = listOf(makeApiEntry("WARN", "Weekly performance heartbeat late", "", "2026-06-12T14:00:00"))
         assertEquals(StrategyFilter.All, mapApiEntries(entries)[0].strategy)

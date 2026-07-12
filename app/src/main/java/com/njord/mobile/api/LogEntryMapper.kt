@@ -17,7 +17,9 @@ internal fun mapApiEntries(entries: List<LogApiEntry>): List<LogEntry> =
         val entryStrategy = entry.strategy
             ?.let(::parseStrategy)
             ?.takeUnless { it == StrategyFilter.All }
-        val strategy = causeStrategy ?: entryStrategy ?: parseStrategy(entry.title)
+        val contentStrategy = parseStrategy("${entry.title} ${entry.message}")
+            .takeUnless { it == StrategyFilter.All }
+        val strategy = causeStrategy ?: entryStrategy ?: contentStrategy ?: parseStrategy(entry.title)
         val strategyTitle = entry.causeStrategyName
             ?: causeStrategy?.label
             ?: entry.strategyName

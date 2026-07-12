@@ -3046,8 +3046,8 @@ private fun PositionSheet(position: LivePosition, onClose: () -> Unit) {
         SummaryLine("P&L", "${position.pnl} ${position.pct}", if (position.pnl.startsWith("-")) Tone.Danger else Tone.Success)
         SummaryLine("Size", position.size, Tone.Muted)
         SummaryLine("Capital", position.capital, Tone.Muted)
-        SummaryLine("Entry", position.entry, Tone.Muted)
         SummaryLine("Current", position.current, if (position.trendUp) Tone.Success else Tone.Danger)
+        SummaryLine("Entry", position.entry, Tone.Muted)
         position.ma20?.let { SummaryLine("MA20", it, Tone.Muted) }
         Spacer(Modifier.height(18.dp))
     }
