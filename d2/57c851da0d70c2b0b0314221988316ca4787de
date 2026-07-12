@@ -1,0 +1,32 @@
+app/src/test/java/com/njord/mobile/api/NjordApiClientTest.kt
+  s_d37a5564981955::t_6a2e04f954758a 1190-1194
+  s_d37a5564981955::t_df6db19b8b33cb 1189
+app/src/main/java/com/njord/mobile/api/LogEntryMapper.kt
+  s_d37a5564981955::t_2dd903d61600db 20-22
+app/src/main/java/com/njord/mobile/ui/NjordApp.kt
+  s_038328b72f5089::t_a7582416bd0f14 3050
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "d257c851da0d70c2b0b0314221988316ca4787de",
+  "prompts": {},
+  "sessions": {
+    "s_038328b72f5089": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "s_038328b72f5089",
+        "model": "unknown"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    },
+    "s_d37a5564981955": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5679-12e9-7290-9275-4bb55ec61b38",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Victor <roliveira.victor@gmail.com>"
+    }
+  }
+}
