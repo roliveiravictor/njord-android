@@ -425,6 +425,7 @@ class NjordApiClientTest {
                   "current_price": 1.9939,
                   "capital": 343.5574,
                   "quantity": 170.61,
+                  "ma20": 2.0456,
                   "unrealized_pnl": -3.3781,
                   "unrealized_pnl_pct": -0.9832,
                   "trend_up": false
@@ -457,6 +458,7 @@ class NjordApiClientTest {
                     "current_price": 1.9939,
                     "capital": 343.5574,
                     "quantity": 170.61,
+                    "ma20": 2.0456,
                     "unrealized_pnl": -3.3781,
                     "unrealized_pnl_pct": -0.9832,
                     "trend_up": false
@@ -484,6 +486,7 @@ class NjordApiClientTest {
         val response = (result as LiveResult.Success).response
         assertEquals(1, response.positions.size)
         assertEquals("ATOM/USDT", response.positions[0].symbol)
+        assertEquals(2.0456, response.positions[0].ma20 ?: 0.0, 0.0001)
         assertEquals(-3.3781, response.positions[0].unrealizedPnl, 0.0001)
         assertEquals(1, response.analytics?.strategyContributions?.size)
         assertEquals(1, response.analytics?.liveSummary?.positionCount)
@@ -760,6 +763,7 @@ class NjordApiClientTest {
             currentPrice = 1.9939,
             capital = 343.5574,
             quantity = 170.61,
+            ma20 = 2.0456,
             unrealizedPnl = -3.3781,
             unrealizedPnlPct = -0.9832,
             trendUp = false
@@ -802,6 +806,7 @@ class NjordApiClientTest {
         assertEquals("-\$3.38", positions[0].pnl)
         assertEquals("-1.0%", positions[0].pct)
         assertEquals("170.61 ATOM", positions[0].size)
+        assertEquals("\$2.05", positions[0].ma20)
         assertEquals("-\$3.38", analytics?.totalContribution)
         assertEquals("Big Bang", analytics?.strategyContributions?.single()?.strategy)
         assertEquals("Leveraged capital", analytics?.summaryItems?.first()?.subtext)

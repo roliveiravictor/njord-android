@@ -42,6 +42,7 @@ private fun mapLivePosition(position: LiveApiPosition): LivePosition {
         capital = formatCompactCurrency(position.capital),
         entry = formatPrice(position.entryPrice),
         current = formatPrice(position.currentPrice),
+        ma20 = position.ma20?.let(::formatPrice),
         trendUp = position.trendUp
     )
 }
@@ -68,9 +69,9 @@ private fun mapLiveAnalytics(analytics: LiveApiAnalytics, positions: List<LivePo
             )
         },
         summaryItems = listOf(
-            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "", Tone.Muted),
+            MiniKpi("DEPLOYED", formatCompactCurrency(summary?.totalCapital ?: 0.0), "Leveraged capital", Tone.Muted),
             MiniKpi("AVG AGE", formatAgeHours(summary?.avgAgeHours ?: 0.0), "", Tone.Muted),
-            MiniKpi("INTEGRITY", "$localPositionCount/$positionCount", "", integrityTone(integrityMismatchCount))
+            MiniKpi("INTEGRITY", "$localPositionCount/$positionCount", "Cache vs. CEX", integrityTone(integrityMismatchCount))
         ),
         largestWinner = analytics.liveMetrics?.largestWinner?.let(::mapLiveOutcome),
         largestLoser = analytics.liveMetrics?.largestLoser?.let(::mapLiveOutcome),

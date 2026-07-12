@@ -194,6 +194,7 @@ data class LiveApiPosition(
     val currentPrice: Double,
     val capital: Double,
     val quantity: Double?,
+    val ma20: Double?,
     val unrealizedPnl: Double,
     val unrealizedPnlPct: Double,
     val trendUp: Boolean
@@ -641,6 +642,7 @@ object NjordApiClient {
             currentPrice = obj.optDouble("current_price", 0.0),
             capital = obj.optDouble("capital", 0.0),
             quantity = obj.optionalDouble("quantity"),
+            ma20 = obj.optionalDouble("ma20"),
             unrealizedPnl = obj.optDouble("unrealized_pnl", 0.0),
             unrealizedPnlPct = obj.optDouble("unrealized_pnl_pct", 0.0),
             trendUp = obj.optBoolean("trend_up", false)

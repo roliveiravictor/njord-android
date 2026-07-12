@@ -424,6 +424,7 @@ data class LivePosition(
     val capital: String,
     val entry: String,
     val current: String,
+    val ma20: String?,
     val trendUp: Boolean
 )
 

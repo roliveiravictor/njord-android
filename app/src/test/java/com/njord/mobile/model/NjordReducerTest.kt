@@ -336,6 +336,7 @@ private object ReducerFixtures {
             capital = "$2.2k",
             entry = "$41.20",
             current = "$44.66",
+            ma20 = null,
             trendUp = true
         ),
         LivePosition(
@@ -351,6 +352,7 @@ private object ReducerFixtures {
             capital = "$1.1k",
             entry = "$1.02",
             current = "$1.04",
+            ma20 = null,
             trendUp = false
         )
     )

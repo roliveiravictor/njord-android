@@ -857,13 +857,18 @@ private fun HomeScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     }
 }
 
+// WCR is not among the strategies live.py starts by default, so it's excluded
+// from selectable strategy filters even though the enum value stays around for
+// tagging any historical wcr-attributed logs/positions still on disk.
+private val SelectableStrategyFilters = StrategyFilter.entries.filterNot { it == StrategyFilter.Wcr }
+
 @Composable
 private fun PerformanceScreen(state: NjordUiState, onAction: (NjordAction) -> Unit) {
     val snapshot = state.performanceSnapshot
 
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         FilterRow(
-            items = StrategyFilter.entries,
+            items = SelectableStrategyFilters,
             selected = state.performanceStrategyFilter,
             label = { it.label },
             onSelect = { onAction(NjordAction.SetPerformanceStrategyFilter(it)) }
@@ -1169,7 +1174,8 @@ private fun FixedCardPager(
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxWidth().testTag(testTag),
-            pageSpacing = pageSpacing
+            pageSpacing = pageSpacing,
+            verticalAlignment = Alignment.Top
         ) { page ->
             Box(Modifier.fillMaxWidth()) {
                 pageContent(page)
@@ -2027,7 +2033,7 @@ private fun LiveFilterBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            StrategyFilter.entries.forEach { filter ->
+            SelectableStrategyFilters.forEach { filter ->
                 LiveFilterPill(
                     label = filter.label,
                     active = filter == strategyFilter,
@@ -2071,7 +2077,7 @@ private fun LogsFilterBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            StrategyFilter.entries.forEach { filter ->
+            SelectableStrategyFilters.forEach { filter ->
                 LiveFilterPill(
                     label = filter.label,
                     active = filter == strategyFilter,
@@ -3042,6 +3048,7 @@ private fun PositionSheet(position: LivePosition, onClose: () -> Unit) {
         SummaryLine("Capital", position.capital, Tone.Muted)
         SummaryLine("Entry", position.entry, Tone.Muted)
         SummaryLine("Current", position.current, if (position.trendUp) Tone.Success else Tone.Danger)
+        position.ma20?.let { SummaryLine("MA20", it, Tone.Muted) }
         Spacer(Modifier.height(18.dp))
     }
 }
