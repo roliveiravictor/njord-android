@@ -1300,7 +1300,7 @@ private fun ReportReferencePanel(report: HunchReport) {
             ReportSummaryRow("Last Confidence", report.confidence, Tone.Muted)
             ReportSummaryRow("Last Score", report.score, Tone.Muted)
             ReportSummaryRow("Last Signal Date", report.date, Tone.Muted)
-            ReportSummaryRow("Last BTC Price", report.btcPriceAtSignal, Tone.Muted)
+            ReportSummaryRow("Last BTC Price", report.lastBtcPrice, Tone.Muted)
             ReportSummaryRow("Current BTC Price", report.currentBtcPrice, Tone.Muted)
             ReportSummaryRow("Price Delta", report.priceDelta, report.priceDeltaTone)
             ReportSummaryRow("Last Signal Correct", report.wasSignalCorrect, report.wasSignalCorrectTone, showDivider = false)

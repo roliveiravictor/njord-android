@@ -424,7 +424,7 @@ private object ReducerFixtures {
         confidence = "HIGH",
         score = "-0.523",
         date = "2026-06-07",
-        btcPriceAtSignal = "$62,215.00",
+        lastBtcPrice = "$62,215.00",
         currentBtcPrice = "$63,193.50",
         priceDelta = "+1.57%",
         priceDeltaTone = Tone.Success,

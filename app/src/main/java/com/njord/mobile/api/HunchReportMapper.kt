@@ -23,7 +23,7 @@ internal fun mapApiReport(report: HunchReportApiResponse): HunchReport {
         confidence = report.confidence?.uppercase() ?: "N/A",
         score = report.score?.let { formatScore(it) } ?: "N/A",
         date = report.date,
-        btcPriceAtSignal = report.btcPriceAtSignal?.let(USD_FORMATTER::format) ?: "N/A",
+        lastBtcPrice = report.lastBtcPrice?.let(USD_FORMATTER::format) ?: "N/A",
         currentBtcPrice = report.currentBtcPrice?.let(USD_FORMATTER::format) ?: "N/A",
         priceDelta = report.priceDeltaPct?.let { formatSignedPercent(it) } ?: "N/A",
         priceDeltaTone = report.priceDeltaPct?.let(::numberTone) ?: Tone.Muted,

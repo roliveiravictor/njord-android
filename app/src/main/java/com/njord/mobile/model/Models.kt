@@ -456,7 +456,7 @@ data class HunchReport(
     val confidence: String,
     val score: String,
     val date: String,
-    val btcPriceAtSignal: String,
+    val lastBtcPrice: String,
     val currentBtcPrice: String,
     val priceDelta: String,
     val priceDeltaTone: Tone,

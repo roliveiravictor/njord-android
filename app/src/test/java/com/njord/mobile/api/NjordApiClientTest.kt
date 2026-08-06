@@ -924,7 +924,7 @@ class NjordApiClientTest {
               "created_at":"2026-06-12T09:05:00+00:00",
               "confidence":"HIGH",
               "score":-0.523,
-              "btc_price_at_signal":62215.0,
+              "last_btc_price":62215.0,
               "current_btc_price":63193.5,
               "price_delta_pct":1.57,
               "was_signal_correct":false,
@@ -942,6 +942,8 @@ class NjordApiClientTest {
         assertEquals("BEARISH", report.signal)
         assertEquals("SELL", report.rawSignal)
         assertEquals(-0.523, report.score ?: 0.0, 0.0001)
+        assertEquals(62215.0, report.lastBtcPrice ?: 0.0, 0.0001)
+        assertEquals(63193.5, report.currentBtcPrice ?: 0.0, 0.0001)
         assertEquals(false, report.wasSignalCorrect)
         assertEquals(listOf("ETF weakness", "Macro pressure"), report.keyFactors)
         assertEquals(listOf("Peace deal"), report.risks)
@@ -1018,7 +1020,7 @@ class NjordApiClientTest {
             createdAt = "2026-06-12T09:05:00+00:00",
             confidence = "high",
             score = -0.523,
-            btcPriceAtSignal = 62215.0,
+            lastBtcPrice = 62215.0,
             currentBtcPrice = 63193.5,
             priceDeltaPct = 1.57,
             wasSignalCorrect = false,
@@ -1033,7 +1035,7 @@ class NjordApiClientTest {
         assertEquals("SELL", report.signal)
         assertEquals("HIGH", report.confidence)
         assertEquals("-0.523", report.score)
-        assertEquals("$62,215.00", report.btcPriceAtSignal)
+        assertEquals("$62,215.00", report.lastBtcPrice)
         assertEquals("$63,193.50", report.currentBtcPrice)
         assertEquals("+1.57%", report.priceDelta)
         assertEquals("NO", report.wasSignalCorrect)
@@ -1051,7 +1053,7 @@ class NjordApiClientTest {
             createdAt = null,
             confidence = "low",
             score = 0.123,
-            btcPriceAtSignal = 62215.0,
+            lastBtcPrice = 62215.0,
             currentBtcPrice = 63193.5,
             priceDeltaPct = 1.57,
             wasSignalCorrect = true,
